@@ -1,11 +1,9 @@
 import { API_BASE_URL, KNOWLEDGE_BASE } from './config';
 import { getAccessToken } from '../auth-store';
+import { fetchWithAuth } from './fetchWithAuth';
 
 export async function getDocuments() {
-  const token = await getAccessToken();
-  const res = await fetch(`${KNOWLEDGE_BASE}/documents?page=0&size=20`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await fetchWithAuth(`${KNOWLEDGE_BASE}/documents?page=0&size=20`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to load documents');
   return data;
