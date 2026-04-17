@@ -13,6 +13,7 @@ export async function setAuth(data: any): Promise<void> {
     email: data.email,
     tenantId: data.tenantId,
     roles: data.roles,
+    permissions: data.permissions ?? [],
   }));
 }
 
@@ -29,4 +30,22 @@ export async function clearAuth(): Promise<void> {
   await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
   await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
   await SecureStore.deleteItemAsync(USER_KEY);
+}
+
+export async function getUserRoles(): Promise<string[]> {
+  const user = await getUser();
+  return user?.roles ?? [];
+}
+
+export async function hasPermission(permission: string): Promise<boolean> {
+  const user = await getUser();
+  const permissions: string[] = user?.permissions ?? [];
+  const roles: string[] = user?.roles ?? [];
+  // Check both permissions array and roles
+  return permissions.includes(permission) || roles.includes(permission);
+}
+
+export async function isRole(role: string): Promise<boolean> {
+  const roles = await getUserRoles();
+  return roles.includes(role);
 }

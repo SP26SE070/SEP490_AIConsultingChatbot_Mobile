@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { router } from 'expo-router';
-import { getAccessToken } from '../lib/auth-store';
+import { getAccessToken, isRole } from '../lib/auth-store';
 import { View, ActivityIndicator } from 'react-native';
 
 export default function Index() {
@@ -11,7 +11,12 @@ export default function Index() {
   async function checkAuth() {
     const token = await getAccessToken();
     if (token) {
-      router.replace('/chatbot');
+      const staffRole = await isRole('ROLE_STAFF');
+      if (staffRole) {
+        router.replace('/staff');
+      } else {
+        router.replace('/chatbot');
+      }
     } else {
       router.replace('/login');
     }

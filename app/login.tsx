@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { login } from '../lib/api/auth';
-import { setAuth } from '../lib/auth-store';
+import { setAuth, isRole } from '../lib/auth-store';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -18,7 +18,13 @@ export default function LoginScreen() {
     try {
       const data = await login(email.trim(), password);
       await setAuth(data);
-      router.replace('/chatbot');
+
+      const roles: string[] = data.roles ?? [];
+      if (roles.includes('ROLE_STAFF')) {
+        router.replace('/staff');
+      } else {
+        router.replace('/chatbot');
+      }
     } catch (e: any) {
       Alert.alert('Đăng nhập thất bại', e.message || 'Vui lòng kiểm tra lại email và mật khẩu.');
     } finally {
