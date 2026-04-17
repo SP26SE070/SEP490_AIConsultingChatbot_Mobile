@@ -69,9 +69,14 @@ export default function ChatbotScreen() {
           <Text style={{ color: '#22c55e', fontSize: 13 }}>Lịch sử</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>AI Chatbot</Text>
-        <TouchableOpacity onPress={handleLogout}>
-          <Text style={styles.logoutText}>Đăng xuất</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => router.push('/documents')}>
+            <Text style={{ color: '#22c55e', fontSize: 13 }}>Tài liệu</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout}>
+            <Text style={{ color: '#ef4444', fontSize: 13 }}>Đăng xuất</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Messages */}
