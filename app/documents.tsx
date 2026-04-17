@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, ActivityIndicator, SafeAreaView
+  StyleSheet, ActivityIndicator, SafeAreaView, Alert, Linking
 } from 'react-native';
 import { router } from 'expo-router';
-import { getDocuments } from '../lib/api/documents';
+import { getDocuments, getDocumentUrl } from '../lib/api/documents';
 
 interface Document {
   id: string;
@@ -69,6 +69,15 @@ export default function DocumentsScreen() {
     return '📎';
   }
 
+  async function handleOpenDocument(documentId: string) {
+    try {
+      const url = await getDocumentUrl(documentId);
+      await Linking.openURL(url);
+    } catch (e) {
+      Alert.alert('Lỗi', 'Không thể mở tài liệu. Vui lòng thử lại.');
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -105,7 +114,10 @@ export default function DocumentsScreen() {
             </View>
           }
           renderItem={({ item }) => (
-            <View style={styles.documentItem}>
+            <TouchableOpacity
+              style={styles.documentItem}
+              onPress={() => handleOpenDocument(item.id)}
+            >
               <View style={styles.documentRow}>
                 <Text style={styles.fileIcon}>{getFileIcon(item.fileType)}</Text>
                 <View style={styles.documentInfo}>
@@ -130,7 +142,7 @@ export default function DocumentsScreen() {
                   </Text>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           )}
         />
       )}
