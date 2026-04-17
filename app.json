@@ -3,6 +3,7 @@
     "name": "SEP490_AIConsultingChatbot_Mobile",
     "slug": "SEP490_AIConsultingChatbot_Mobile",
     "version": "1.0.0",
+    "main": "expo-router/entry",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -25,6 +26,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      }
     }
   }
 }
