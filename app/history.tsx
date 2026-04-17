@@ -76,7 +76,7 @@ export default function HistoryScreen() {
       {!loading && !error && (
         <FlatList
           data={conversations}
-          keyExtractor={item => item.id}
+          keyExtractor={(item, index) => item.id ?? index.toString()}
           contentContainerStyle={styles.list}
           ListEmptyComponent={
             <View style={styles.centered}>
