@@ -5,11 +5,14 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { getConversations } from '../lib/api/chatbot';
+import { setPendingConversation } from '../lib/navigation-store';
 
 interface Conversation {
-  id: string;
+  conversationId: string;
+  id?: string;
   title: string;
-  createdAt: string;
+  status: string;
+  startedAt: string;
   lastMessageAt?: string;
   totalMessages?: number;
 }
@@ -76,26 +79,27 @@ export default function HistoryScreen() {
       {!loading && !error && (
         <FlatList
           data={conversations}
-          keyExtractor={(item, index) => item.id ?? index.toString()}
+          keyExtractor={(item, index) => item.conversationId ?? index.toString()}
           contentContainerStyle={styles.list}
           ListEmptyComponent={
             <View style={styles.centered}>
               <Text style={styles.emptyText}>Chưa có cuộc trò chuyện nào</Text>
             </View>
           }
-          renderItem={({ item }) => (
+          renderItem={({ item }) => {
+            return (
             <TouchableOpacity
               style={styles.conversationItem}
-              onPress={() => router.push({
-                pathname: '/chatbot',
-                params: { conversationId: item.id }
-              })}
+              onPress={() => {
+                setPendingConversation(item.conversationId);
+                router.push('/chatbot');
+              }}
             >
               <Text style={styles.conversationTitle} numberOfLines={1}>
                 {item.title || 'Cuộc trò chuyện'}
               </Text>
               <Text style={styles.conversationDate}>
-                {formatDate(item.lastMessageAt || item.createdAt)}
+                {formatDate(item.lastMessageAt || item.startedAt)}
               </Text>
               {item.totalMessages !== undefined && (
                 <Text style={styles.messageCount}>
@@ -103,7 +107,8 @@ export default function HistoryScreen() {
                 </Text>
               )}
             </TouchableOpacity>
-          )}
+            );
+          }}
         />
       )}
     </SafeAreaView>

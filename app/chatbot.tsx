@@ -1,12 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   FlatList, StyleSheet, ActivityIndicator,
   KeyboardAvoidingView, Platform, SafeAreaView
 } from 'react-native';
-import { router } from 'expo-router';
-import { sendMessage } from '../lib/api/chatbot';
+import { router, useFocusEffect } from 'expo-router';
+import { sendMessage, getConversationHistory } from '../lib/api/chatbot';
 import { clearAuth, getUser } from '../lib/auth-store';
+import { getPendingConversation } from '../lib/navigation-store';
 
 interface Message {
   id: string;
@@ -15,11 +16,41 @@ interface Message {
 }
 
 export default function ChatbotScreen() {
+  const [conversationId, setConversationId] = useState<string | undefined>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [conversationId, setConversationId] = useState<string | undefined>();
   const flatListRef = useRef<FlatList>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      const convId = getPendingConversation();
+      if (convId) {
+        setConversationId(convId);
+        setMessages([]);
+        loadConversationHistory(convId);
+      }
+    }, [])
+  );
+
+  async function loadConversationHistory(convId: string) {
+    try {
+      setLoading(true);
+      const data = await getConversationHistory(convId);
+      if (data.messages && Array.isArray(data.messages)) {
+        const loadedMessages: Message[] = data.messages.map((msg: any) => ({
+          id: msg.id || msg.messageId || Date.now().toString(),
+          role: msg.role === 'USER' ? 'user' : 'assistant',
+          content: msg.content,
+        }));
+        setMessages(loadedMessages);
+      }
+    } catch (e) {
+      console.warn('Failed to load conversation history:', e);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSend() {
     if (!input.trim() || loading) return;

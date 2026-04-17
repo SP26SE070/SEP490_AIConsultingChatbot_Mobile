@@ -19,6 +19,13 @@ export async function getConversations() {
   return data;
 }
 
+export async function getConversationHistory(conversationId: string) {
+  const res = await fetchWithAuth(`${CHATBOT_BASE}/history/${conversationId}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to load conversation');
+  return data;
+}
+
 export async function rateMessage(messageId: string, rating: 'helpful' | 'not-helpful') {
   const numericRating = rating === 'helpful' ? 5 : 1;
   await fetchWithAuth(`${CHATBOT_BASE}/messages/${messageId}/rate`, {
