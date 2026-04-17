@@ -13,16 +13,5 @@ export async function getDocuments() {
 
 export async function getDocumentUrl(documentId: string): Promise<string> {
   const token = await getAccessToken();
-  // Use download-proxy endpoint via backend
-  const backendUrl = `${API_BASE_URL}/api/v1/knowledge/documents/${documentId}/download-proxy`;
-
-  // Fetch through backend with auth, get blob, create object URL
-  const res = await fetch(backendUrl, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error('Failed to get document');
-
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  return url;
+  return `${API_BASE_URL}/api/v1/knowledge/documents/${documentId}/download-proxy?token=${token}`;
 }
