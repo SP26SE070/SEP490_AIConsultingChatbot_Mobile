@@ -104,6 +104,9 @@ export default function ChatbotScreen() {
           <TouchableOpacity onPress={() => router.push('/documents')}>
             <Text style={{ color: '#22c55e', fontSize: 13 }}>Tài liệu</Text>
           </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/profile')}>
+            <Text style={{ color: '#22c55e', fontSize: 13 }}>Hồ sơ</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleLogout}>
             <Text style={{ color: '#ef4444', fontSize: 13 }}>Đăng xuất</Text>
           </TouchableOpacity>
