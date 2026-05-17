@@ -1,14 +1,40 @@
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 const ACCESS_TOKEN_KEY = 'auth_access_token';
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
 const USER_KEY = 'auth_user';
 
+// Platform-aware storage wrapper
+const storage = {
+  async setItem(key: string, value: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(key, value);
+    } else {
+      await SecureStore.setItemAsync(key, value);
+    }
+  },
+  async getItem(key: string): Promise<string | null> {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(key);
+    } else {
+      return await SecureStore.getItemAsync(key);
+    }
+  },
+  async deleteItem(key: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      localStorage.removeItem(key);
+    } else {
+      await SecureStore.deleteItemAsync(key);
+    }
+  },
+};
+
 export async function setAuth(data: any): Promise<void> {
   if (!data.accessToken || !data.refreshToken) return;
-  await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, data.accessToken);
-  await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, data.refreshToken);
-  await SecureStore.setItemAsync(USER_KEY, JSON.stringify({
+  await storage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+  await storage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+  await storage.setItem(USER_KEY, JSON.stringify({
     id: data.id,
     email: data.email,
     tenantId: data.tenantId,
@@ -18,18 +44,18 @@ export async function setAuth(data: any): Promise<void> {
 }
 
 export async function getAccessToken(): Promise<string | null> {
-  return await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+  return await storage.getItem(ACCESS_TOKEN_KEY);
 }
 
 export async function getUser(): Promise<any | null> {
-  const raw = await SecureStore.getItemAsync(USER_KEY);
+  const raw = await storage.getItem(USER_KEY);
   return raw ? JSON.parse(raw) : null;
 }
 
 export async function clearAuth(): Promise<void> {
-  await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
-  await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
-  await SecureStore.deleteItemAsync(USER_KEY);
+  await storage.deleteItem(ACCESS_TOKEN_KEY);
+  await storage.deleteItem(REFRESH_TOKEN_KEY);
+  await storage.deleteItem(USER_KEY);
 }
 
 export async function getUserRoles(): Promise<string[]> {

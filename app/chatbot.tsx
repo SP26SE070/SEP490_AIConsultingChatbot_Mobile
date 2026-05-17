@@ -87,6 +87,11 @@ export default function ChatbotScreen() {
     }
   }
 
+  function handleNewChat() {
+    setConversationId(undefined);
+    setMessages([]);
+  }
+
   async function handleLogout() {
     await clearAuth();
     router.replace('/login');
@@ -96,9 +101,14 @@ export default function ChatbotScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push('/history')}>
-          <Text style={{ color: '#22c55e', fontSize: 13 }}>Lịch sử</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+          <TouchableOpacity onPress={handleNewChat} style={styles.newChatButton}>
+            <Text style={styles.newChatText}>+ Chat mới</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/history')}>
+            <Text style={{ color: '#22c55e', fontSize: 13 }}>Lịch sử</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.headerTitle}>AI Chatbot</Text>
         <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
           <TouchableOpacity onPress={() => router.push('/documents')}>
@@ -193,6 +203,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#22c55e',
+  },
+  newChatButton: {
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  newChatText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 'bold',
   },
   logoutText: {
     color: '#ef4444',
