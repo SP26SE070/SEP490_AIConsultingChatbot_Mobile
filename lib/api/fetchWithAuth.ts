@@ -34,3 +34,29 @@ export async function fetchWithAuth(
 
   return res;
 }
+
+export async function fetchJsonWithAuth<T = any>(
+  url: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const res = await fetchWithAuth(url, options);
+  
+  const text = await res.text();
+  
+  // Check if response is HTML (not authenticated or error page)
+  if (text.trim().startsWith('<')) {
+    if (text.includes('login') || text.includes('Login')) {
+      throw { status: 401, message: 'Vui lòng đăng nhập lại' };
+    }
+    throw { status: res.status, message: 'Lỗi server' };
+  }
+  
+  try {
+    const data = JSON.parse(text);
+    if (!res.ok) throw { status: res.status, message: data.message || 'Lỗi API' };
+    return data;
+  } catch (e) {
+    if (e.status) throw e;
+    throw { status: 500, message: 'Không thể đọc phản hồi' };
+  }
+}

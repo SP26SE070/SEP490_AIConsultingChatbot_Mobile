@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, ActivityIndicator, SafeAreaView
+  StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { getConversations } from '../lib/api/chatbot';
 import { setPendingConversation } from '../lib/navigation-store';
+import { COLORS } from '../lib/theme';
+import { AppShell } from '../components/layout/AppShell';
 
 interface Conversation {
   conversationId: string;
@@ -52,18 +54,10 @@ export default function HistoryScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>← Quay lại</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Lịch sử trò chuyện</Text>
-        <View style={{ width: 80 }} />
-      </View>
-
+    <AppShell title="Lịch sử" subtitle="Các cuộc trò chuyện trước đây">
       {loading && (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#22c55e" />
+          <ActivityIndicator size="large" color={COLORS.accent} />
         </View>
       )}
 
@@ -111,33 +105,11 @@ export default function HistoryScreen() {
           }}
         />
       )}
-    </SafeAreaView>
+    </AppShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#f1f5f9',
-  },
-  backText: {
-    color: '#22c55e',
-    fontSize: 14,
-    width: 80,
-  },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -145,23 +117,23 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   errorText: {
-    color: '#ef4444',
+    color: COLORS.danger,
     fontSize: 15,
     textAlign: 'center',
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#22c55e',
+    backgroundColor: COLORS.accent,
     paddingHorizontal: 24,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   retryText: {
     color: '#fff',
     fontWeight: '600',
   },
   emptyText: {
-    color: '#64748b',
+    color: COLORS.textMuted,
     fontSize: 15,
     textAlign: 'center',
   },
@@ -170,25 +142,26 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   conversationItem: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: COLORS.border,
   },
   conversationTitle: {
-    color: '#f1f5f9',
+    color: COLORS.text,
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 4,
   },
   conversationDate: {
-    color: '#64748b',
+    color: COLORS.textMuted,
     fontSize: 12,
     marginBottom: 4,
   },
   messageCount: {
-    color: '#22c55e',
+    color: COLORS.accent,
     fontSize: 12,
+    fontWeight: '600',
   },
 });

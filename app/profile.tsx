@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, SafeAreaView,
+  StyleSheet, ActivityIndicator,
   Alert, ScrollView, Modal, Platform
 } from 'react-native';
-import { router } from 'expo-router';
 import { getProfile, changePassword, updateProfile, sendOtpForContactEmail, updateContactEmail } from '../lib/api/profile';
-import { clearAuth } from '../lib/auth-store';
+import { COLORS } from '../lib/theme';
+import { AppShell } from '../components/layout/AppShell';
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
@@ -249,31 +249,18 @@ export default function ProfileScreen() {
     }
   }
 
-  async function handleLogout() {
-    await clearAuth();
-    router.replace('/login');
-  }
-
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <AppShell title="Hồ sơ cá nhân" subtitle="Thông tin tài khoản">
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#22c55e" />
+          <ActivityIndicator size="large" color={COLORS.accent} />
         </View>
-      </SafeAreaView>
+      </AppShell>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>← Quay lại</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Hồ sơ cá nhân</Text>
-        <View style={{ width: 80 }} />
-      </View>
-
+    <AppShell title="Hồ sơ cá nhân" subtitle="Quản lý thông tin tài khoản">
       <ScrollView contentContainerStyle={styles.content}>
         {/* Profile Info */}
         <View style={styles.card}>
@@ -437,11 +424,6 @@ export default function ProfileScreen() {
             }
           </TouchableOpacity>
         </View>
-
-        {/* Logout */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutBtnText}>Đăng xuất</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       {/* Contact Email Modal */}
@@ -605,7 +587,7 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </AppShell>
   );
 }
 

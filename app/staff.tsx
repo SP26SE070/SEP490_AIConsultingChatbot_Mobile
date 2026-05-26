@@ -1,49 +1,53 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, ActivityIndicator, SafeAreaView,
-  Alert, TextInput, Modal, RefreshControl
+  StyleSheet, ActivityIndicator, Alert, RefreshControl,
+  Modal, ScrollView
 } from 'react-native';
-import { router } from 'expo-router';
-import { getTenants, approveTenant, rejectTenant } from '../lib/api/staff';
-import { clearAuth } from '../lib/auth-store';
+import { Ionicons } from '@expo/vector-icons';
+import { AppShell } from '../components/layout/AppShell';
+import { COLORS } from '../lib/theme';
+import {
+  getEmployees, activateEmployee, deactivateEmployee,
+  deleteEmployee, resetEmployeePassword,
+  type EmployeeUser
+} from '../lib/api/employees';
+import { useLanguageStore, translations } from '../lib/language-store';
 
-interface Tenant {
-  id: string;
-  name: string;
-  contactEmail: string;
-  status: string;
-  requestedAt: string;
-  representativeName?: string;
-  requestMessage?: string;
-}
-
-type FilterStatus = 'ALL' | 'PENDING' | 'ACTIVE' | 'REJECTED' | 'SUSPENDED';
+type FilterStatus = 'ALL' | 'ACTIVE' | 'INACTIVE';
 
 export default function StaffScreen() {
-  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const { language } = useLanguageStore();
+  const t = translations[language];
+  const [employees, setEmployees] = useState<EmployeeUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterStatus>('ALL');
-  const [rejectModal, setRejectModal] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Detail modal
+  const [detailModal, setDetailModal] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeUser | null>(null);
 
   useEffect(() => {
-    loadTenants();
+    loadEmployees();
   }, [filter]);
 
-  async function loadTenants() {
+  async function loadEmployees() {
     try {
       setLoading(true);
-      const data = await getTenants(filter === 'ALL' ? undefined : filter);
-      const allTenants = Array.isArray(data) ? data : (data.content ?? data.data ?? []);
-      const filtered = filter === 'ALL'
-        ? allTenants
-        : allTenants.filter((t: any) => t.status === filter);
-      setTenants(filtered);
+      const status = filter === 'ALL' ? undefined : filter;
+      const data = await getEmployees(status);
+      setEmployees(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      Alert.alert('Lỗi', 'Không thể tải danh sách tổ chức');
+      console.warn('Load employees error:', e);
+      if (e?.status === 401) {
+        Alert.alert(t.error, t.sessionExpired);
+      } else if (e?.status === 403) {
+        Alert.alert(t.error, language === 'vi' ? 'Bạn không có quyền xem danh sách nhân viên.' : 'You do not have permission to view employee list.');
+      } else {
+        Alert.alert(t.error, language === 'vi' ? 'Không thể tải danh sách nhân viên.' : 'Cannot load employee list.');
+      }
     } finally {
       setLoading(false);
     }
@@ -51,25 +55,28 @@ export default function StaffScreen() {
 
   async function onRefresh() {
     setRefreshing(true);
-    await loadTenants();
+    await loadEmployees();
     setRefreshing(false);
   }
 
-  async function handleApprove(tenant: Tenant) {
+  async function handleActivate(emp: EmployeeUser) {
     Alert.alert(
-      'Phê duyệt',
-      `Phê duyệt tổ chức "${tenant.name}"?`,
+      t.activate,
+      `${language === 'vi' ? 'Kích hoạt tài khoản' : 'Activate account'} "${emp.fullName || emp.email}"?`,
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: t.cancel, style: 'cancel' },
         {
-          text: 'Phê duyệt',
+          text: t.activate,
           onPress: async () => {
             try {
-              await approveTenant(tenant.id);
-              Alert.alert('Thành công', 'Tổ chức đã được phê duyệt');
-              loadTenants();
-            } catch (e: any) {
-              Alert.alert('Lỗi', e.message || 'Không thể phê duyệt');
+              setActionLoading(emp.id);
+              await activateEmployee(emp.id);
+              Alert.alert(t.success, language === 'vi' ? 'Tài khoản đã được kích hoạt' : 'Account has been activated');
+              loadEmployees();
+            } catch (err: any) {
+              Alert.alert(t.error, err.message || (language === 'vi' ? 'Không thể kích hoạt' : 'Cannot activate'));
+            } finally {
+              setActionLoading(null);
             }
           }
         }
@@ -77,75 +84,208 @@ export default function StaffScreen() {
     );
   }
 
-  function handleRejectPress(tenant: Tenant) {
-    setSelectedTenant(tenant);
-    setRejectReason('');
-    setRejectModal(true);
+  async function handleDeactivate(emp: EmployeeUser) {
+    Alert.alert(
+      t.deactivate,
+      `${language === 'vi' ? 'Vô hiệu hóa tài khoản' : 'Deactivate account'} "${emp.fullName || emp.email}"?`,
+      [
+        { text: t.cancel, style: 'cancel' },
+        {
+          text: t.deactivate,
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setActionLoading(emp.id);
+              await deactivateEmployee(emp.id);
+              Alert.alert(t.success, language === 'vi' ? 'Tài khoản đã được vô hiệu hóa' : 'Account has been deactivated');
+              loadEmployees();
+            } catch (err: any) {
+              Alert.alert(t.error, err.message || (language === 'vi' ? 'Không thể vô hiệu hóa' : 'Cannot deactivate'));
+            } finally {
+              setActionLoading(null);
+            }
+          }
+        }
+      ]
+    );
   }
 
-  async function handleRejectConfirm() {
-    if (!selectedTenant) return;
-    if (!rejectReason.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập lý do từ chối');
-      return;
-    }
-    try {
-      await rejectTenant(selectedTenant.id, rejectReason.trim());
-      setRejectModal(false);
-      Alert.alert('Thành công', 'Tổ chức đã bị từ chối');
-      loadTenants();
-    } catch (e: any) {
-      Alert.alert('Lỗi', e.message || 'Không thể từ chối');
-    }
+  async function handleDelete(emp: EmployeeUser) {
+    Alert.alert(
+      language === 'vi' ? 'Xóa nhân viên' : 'Delete Employee',
+      `${language === 'vi' ? 'Xóa' : 'Delete'} "${emp.fullName || emp.email}"?`,
+      [
+        { text: t.cancel, style: 'cancel' },
+        {
+          text: t.delete,
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setActionLoading(emp.id);
+              await deleteEmployee(emp.id);
+              Alert.alert(t.success, language === 'vi' ? 'Nhân viên đã được xóa' : 'Employee has been deleted');
+              loadEmployees();
+            } catch (err: any) {
+              Alert.alert(t.error, err.message || (language === 'vi' ? 'Không thể xóa' : 'Cannot delete'));
+            } finally {
+              setActionLoading(null);
+            }
+          }
+        }
+      ]
+    );
   }
 
-  async function handleLogout() {
-    await clearAuth();
-    router.replace('/login');
+  async function handleResetPassword(emp: EmployeeUser) {
+    Alert.alert(
+      t.resetPassword,
+      `${language === 'vi' ? 'Gửi mật khẩu mới cho' : 'Send new password to'} "${emp.email}"?`,
+      [
+        { text: t.cancel, style: 'cancel' },
+        {
+          text: language === 'vi' ? 'Gửi' : 'Send',
+          onPress: async () => {
+            try {
+              setActionLoading(emp.id);
+              await resetEmployeePassword(emp.id);
+              Alert.alert(t.success, language === 'vi' ? 'Mật khẩu mới đã được gửi đến email' : 'New password has been sent to email');
+            } catch (err: any) {
+              Alert.alert(t.error, err.message || (language === 'vi' ? 'Không thể reset mật khẩu' : 'Cannot reset password'));
+            } finally {
+              setActionLoading(null);
+            }
+          }
+        }
+      ]
+    );
   }
 
-  function getStatusColor(status: string) {
-    switch (status) {
-      case 'PENDING': return '#f59e0b';
-      case 'ACTIVE': return '#22c55e';
-      case 'REJECTED': return '#ef4444';
-      case 'SUSPENDED': return '#6366f1';
-      default: return '#64748b';
-    }
+  function handleViewDetail(emp: EmployeeUser) {
+    setSelectedEmployee(emp);
+    setDetailModal(true);
   }
 
-  function getStatusLabel(status: string) {
-    switch (status) {
-      case 'PENDING': return 'Chờ duyệt';
-      case 'ACTIVE': return 'Hoạt động';
-      case 'REJECTED': return 'Từ chối';
-      case 'SUSPENDED': return 'Tạm ngưng';
-      default: return status;
-    }
+  function getStatusColor(isActive: boolean) {
+    return isActive ? '#22c55e' : '#ef4444';
   }
 
-  const filters: FilterStatus[] = ['PENDING', 'ACTIVE', 'REJECTED', 'ALL'];
+  function getStatusLabel(isActive: boolean) {
+    return isActive ? t.active : t.inactive;
+  }
+
+  const filters: { key: FilterStatus; label: string }[] = [
+    { key: 'ACTIVE', label: t.active },
+    { key: 'INACTIVE', label: t.inactive },
+    { key: 'ALL', label: t.all },
+  ];
+
+  const renderEmployee = ({ item }: { item: EmployeeUser }) => {
+    const isLoading = actionLoading === item.id;
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => handleViewDetail(item)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {(item.fullName || item.email).charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.info}>
+            <Text style={styles.name} numberOfLines={1}>
+              {item.fullName || '—'}
+            </Text>
+            <Text style={styles.email} numberOfLines={1}>{item.email}</Text>
+            {item.roleName && (
+              <Text style={styles.role}>{item.roleName}</Text>
+            )}
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.isActive) + '20' }]}>
+            <Text style={[styles.statusText, { color: getStatusColor(item.isActive) }]}>
+              {getStatusLabel(item.isActive)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Action buttons */}
+        <View style={styles.actions}>
+          {isLoading ? (
+            <ActivityIndicator size="small" color={COLORS.accent} />
+          ) : (
+            <>
+              {item.isActive ? (
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.deactivateBtn]}
+                  onPress={() => handleDeactivate(item)}
+                >
+                  <Ionicons name="pause" size={14} color="#fff" />
+                  <Text style={styles.actionText}>{language === 'vi' ? 'Tắt' : 'Off'}</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.activateBtn]}
+                  onPress={() => handleActivate(item)}
+                >
+                  <Ionicons name="play" size={14} color="#fff" />
+                  <Text style={styles.actionText}>{language === 'vi' ? 'Bật' : 'On'}</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.resetBtn]}
+                onPress={() => handleResetPassword(item)}
+              >
+                <Ionicons name="key" size={14} color="#fff" />
+                <Text style={styles.actionText}>{language === 'vi' ? 'Reset' : 'Reset'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.deleteBtn]}
+                onPress={() => handleDelete(item)}
+              >
+                <Ionicons name="trash" size={14} color="#fff" />
+                <Text style={styles.actionText}>{t.delete}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Quản lý tổ chức</Text>
-        <TouchableOpacity onPress={handleLogout}>
-          <Text style={styles.logoutText}>Đăng xuất</Text>
-        </TouchableOpacity>
+    <AppShell title={t.manageEmployees} subtitle={t.employeeList}>
+      {/* Stats */}
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{employees.length}</Text>
+          <Text style={styles.statLabel}>{t.total}</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={[styles.statValue, { color: '#22c55e' }]}>
+            {employees.filter(e => e.isActive).length}
+          </Text>
+          <Text style={styles.statLabel}>{t.active}</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={[styles.statValue, { color: '#ef4444' }]}>
+            {employees.filter(e => !e.isActive).length}
+          </Text>
+          <Text style={styles.statLabel}>{t.inactive}</Text>
+        </View>
       </View>
 
       {/* Filter tabs */}
       <View style={styles.filterRow}>
         {filters.map(f => (
           <TouchableOpacity
-            key={f}
-            style={[styles.filterTab, filter === f && styles.filterTabActive]}
-            onPress={() => setFilter(f)}
+            key={f.key}
+            style={[styles.filterTab, filter === f.key && styles.filterTabActive]}
+            onPress={() => setFilter(f.key)}
           >
-            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
-              {f === 'ALL' ? 'Tất cả' : getStatusLabel(f)}
+            <Text style={[styles.filterText, filter === f.key && styles.filterTextActive]}>
+              {f.label}
             </Text>
           </TouchableOpacity>
         ))}
@@ -154,181 +294,234 @@ export default function StaffScreen() {
       {/* List */}
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#22c55e" />
+          <ActivityIndicator size="large" color={COLORS.accent} />
         </View>
       ) : (
         <FlatList
-          data={tenants}
-          keyExtractor={(item, index) => item.id ?? index.toString()}
+          data={employees}
+          keyExtractor={(item) => item.id}
+          renderItem={renderEmployee}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22c55e" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />
           }
           ListEmptyComponent={
             <View style={styles.centered}>
-              <Text style={styles.emptyText}>Không có tổ chức nào</Text>
+              <Ionicons name="people-outline" size={48} color={COLORS.textMuted} />
+              <Text style={styles.emptyText}>{t.noEmployees}</Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.tenantName} numberOfLines={1}>{item.name}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-                  <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-                    {getStatusLabel(item.status)}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.tenantEmail}>{item.contactEmail}</Text>
-              {item.representativeName && (
-                <Text style={styles.tenantRep}>Đại diện: {item.representativeName}</Text>
-              )}
-              {item.requestMessage && (
-                <Text style={styles.tenantMessage} numberOfLines={2}>
-                  {item.requestMessage}
-                </Text>
-              )}
-              {item.status === 'PENDING' && (
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.approveBtn]}
-                    onPress={() => handleApprove(item)}
-                  >
-                    <Text style={styles.actionBtnText}>✓ Phê duyệt</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.rejectBtn]}
-                    onPress={() => handleRejectPress(item)}
-                  >
-                    <Text style={styles.actionBtnText}>✕ Từ chối</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          )}
         />
       )}
 
-      {/* Reject Modal */}
-      <Modal visible={rejectModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Lý do từ chối</Text>
-            <Text style={styles.modalSubtitle}>{selectedTenant?.name}</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Nhập lý do từ chối..."
-              placeholderTextColor="#64748b"
-              value={rejectReason}
-              onChangeText={setRejectReason}
-              multiline
-              numberOfLines={4}
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.cancelBtn]}
-                onPress={() => setRejectModal(false)}
-              >
-                <Text style={styles.modalBtnText}>Hủy</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.confirmBtn]}
-                onPress={handleRejectConfirm}
-              >
-                <Text style={styles.modalBtnText}>Xác nhận</Text>
+      {/* Detail Modal */}
+      <Modal visible={detailModal} transparent animationType="slide">
+        <View style={modalStyles.overlay}>
+          <View style={modalStyles.content}>
+            <View style={modalStyles.header}>
+              <Text style={modalStyles.title}>{t.viewDetails}</Text>
+              <TouchableOpacity onPress={() => setDetailModal(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
+
+            {selectedEmployee && (
+              <ScrollView style={modalStyles.body}>
+                <View style={modalStyles.avatarLarge}>
+                  <Text style={modalStyles.avatarText}>
+                    {(selectedEmployee.fullName || selectedEmployee.email).charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+
+                <View style={modalStyles.infoRow}>
+                  <Ionicons name="person" size={18} color={COLORS.textMuted} />
+                  <View>
+                    <Text style={modalStyles.infoLabel}>{t.fullName}</Text>
+                    <Text style={modalStyles.infoValue}>{selectedEmployee.fullName || '—'}</Text>
+                  </View>
+                </View>
+
+                <View style={modalStyles.infoRow}>
+                  <Ionicons name="mail" size={18} color={COLORS.textMuted} />
+                  <View>
+                    <Text style={modalStyles.infoLabel}>{t.email || 'Email'}</Text>
+                    <Text style={modalStyles.infoValue}>{selectedEmployee.email}</Text>
+                  </View>
+                </View>
+
+                <View style={modalStyles.infoRow}>
+                  <Ionicons name="call" size={18} color={COLORS.textMuted} />
+                  <View>
+                    <Text style={modalStyles.infoLabel}>{t.phone || 'Phone'}</Text>
+                    <Text style={modalStyles.infoValue}>{selectedEmployee.phoneNumber || '—'}</Text>
+                  </View>
+                </View>
+
+                <View style={modalStyles.infoRow}>
+                  <Ionicons name="shield-checkmark" size={18} color={COLORS.textMuted} />
+                  <View>
+                    <Text style={modalStyles.infoLabel}>{t.role || 'Role'}</Text>
+                    <Text style={modalStyles.infoValue}>{selectedEmployee.roleName || '—'}</Text>
+                  </View>
+                </View>
+
+                <View style={modalStyles.infoRow}>
+                  <Ionicons name="business" size={18} color={COLORS.textMuted} />
+                  <View>
+                    <Text style={modalStyles.infoLabel}>{t.department || 'Department'}</Text>
+                    <Text style={modalStyles.infoValue}>{selectedEmployee.departmentName || '—'}</Text>
+                  </View>
+                </View>
+
+                <View style={modalStyles.infoRow}>
+                  <Ionicons name="time" size={18} color={COLORS.textMuted} />
+                  <View>
+                    <Text style={modalStyles.infoLabel}>{t.createdAt || 'Created At'}</Text>
+                    <Text style={modalStyles.infoValue}>
+                      {selectedEmployee.createdAt ? new Date(selectedEmployee.createdAt).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US') : '—'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={[modalStyles.infoRow, { marginTop: 8 }]}>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedEmployee.isActive) + '20' }]}>
+                    <Text style={[styles.statusText, { color: getStatusColor(selectedEmployee.isActive) }]}>
+                      {getStatusLabel(selectedEmployee.isActive)}
+                    </Text>
+                  </View>
+                </View>
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </AppShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  statsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  statItem: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  statValue: { fontSize: 24, fontWeight: '800', color: COLORS.accent },
+  statLabel: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
+  filterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: COLORS.surfaceLight,
+  },
+  filterTabActive: { backgroundColor: COLORS.accent },
+  filterText: { color: COLORS.textMuted, fontSize: 12, fontWeight: '600' },
+  filterTextActive: { color: '#fff' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 12 },
+  emptyText: { color: COLORS.textMuted, fontSize: 15 },
+  list: { padding: 16, gap: 12, paddingBottom: 32 },
+  card: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { fontSize: 18, fontWeight: '700', color: COLORS.accent },
+  info: { flex: 1 },
+  name: { fontSize: 15, fontWeight: '600', color: COLORS.text },
+  email: { fontSize: 12, color: COLORS.textMuted, marginTop: 2 },
+  role: { fontSize: 11, color: COLORS.accent, marginTop: 2 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  statusText: { fontSize: 11, fontWeight: '600' },
+  actions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  activateBtn: { backgroundColor: '#22c55e' },
+  deactivateBtn: { backgroundColor: '#f59e0b' },
+  resetBtn: { backgroundColor: '#3b82f6' },
+  deleteBtn: { backgroundColor: '#ef4444' },
+  actionText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+});
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  content: {
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: COLORS.border,
   },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#f1f5f9' },
-  logoutText: { color: '#ef4444', fontSize: 14 },
-  filterRow: {
-    flexDirection: 'row',
-    padding: 12,
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-  },
-  filterTab: {
-    flex: 1,
-    paddingVertical: 6,
-    borderRadius: 8,
+  title: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  body: { padding: 20 },
+  avatarLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.accentSoft,
     alignItems: 'center',
-    backgroundColor: '#1e293b',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 20,
   },
-  filterTabActive: { backgroundColor: '#22c55e' },
-  filterText: { color: '#64748b', fontSize: 12, fontWeight: '500' },
-  filterTextActive: { color: '#fff' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  emptyText: { color: '#64748b', fontSize: 15, textAlign: 'center' },
-  list: { padding: 16, gap: 12 },
-  card: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  cardHeader: {
+  avatarText: { fontSize: 32, fontWeight: '700', color: COLORS.accent },
+  infoRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  tenantName: { color: '#f1f5f9', fontSize: 15, fontWeight: '600', flex: 1 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  statusText: { fontSize: 11, fontWeight: '600' },
-  tenantEmail: { color: '#64748b', fontSize: 13, marginBottom: 4 },
-  tenantRep: { color: '#94a3b8', fontSize: 12, marginBottom: 4 },
-  tenantMessage: { color: '#475569', fontSize: 12, marginBottom: 8, fontStyle: 'italic' },
-  actionRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  actionBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
-  approveBtn: { backgroundColor: '#22c55e' },
-  rejectBtn: { backgroundColor: '#ef4444' },
-  actionBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#1e293b',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-  },
-  modalTitle: { color: '#f1f5f9', fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
-  modalSubtitle: { color: '#64748b', fontSize: 14, marginBottom: 16 },
-  modalInput: {
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    padding: 12,
-    color: '#f1f5f9',
-    fontSize: 14,
-    minHeight: 100,
-    textAlignVertical: 'top',
-    borderWidth: 1,
-    borderColor: '#334155',
+    gap: 12,
     marginBottom: 16,
   },
-  modalActions: { flexDirection: 'row', gap: 12 },
-  modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
-  cancelBtn: { backgroundColor: '#334155' },
-  confirmBtn: { backgroundColor: '#ef4444' },
-  modalBtnText: { color: '#fff', fontWeight: '600' },
+  infoLabel: { fontSize: 11, color: COLORS.textMuted },
+  infoValue: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginTop: 2 },
 });
