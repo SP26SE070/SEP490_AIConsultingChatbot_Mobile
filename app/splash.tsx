@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getAccessToken } from '../lib/auth-store';
 import { useLanguageStore, translations } from '../lib/language-store';
+import { AppLogo } from '../components/brand/AppLogo';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -96,9 +96,7 @@ export default function SplashScreen() {
       >
         {/* Logo */}
         <View style={styles.logoWrapper}>
-          <View style={styles.logoInner}>
-            <Ionicons name="sparkles" size={48} color="#fff" />
-          </View>
+          <AppLogo size={100} />
         </View>
 
         {/* Title */}
@@ -174,21 +172,6 @@ const styles = StyleSheet.create({
   },
   logoWrapper: {
     marginBottom: 24,
-  },
-  logoInner: {
-    width: 100,
-    height: 100,
-    borderRadius: 28,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(16, 185, 129, 0.4)',
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
   },
   title: {
     fontSize: 36,

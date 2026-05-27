@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { login } from '../lib/api/auth';
 import { setAuth } from '../lib/auth-store';
 import { useLanguageStore, translations } from '../lib/language-store';
+import { AppLogo } from '../components/brand/AppLogo';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -113,9 +114,7 @@ export default function LoginScreen() {
       >
         {/* Logo */}
         <View style={styles.logoWrapper}>
-          <View style={styles.logoInner}>
-            <Ionicons name="sparkles" size={32} color="#fff" />
-          </View>
+          <AppLogo size={80} />
           <Text style={styles.brandTitle}>AI Chatbot</Text>
           <Text style={styles.brandSubtitle}>For Tenants</Text>
         </View>
@@ -283,18 +282,7 @@ const styles = StyleSheet.create({
   },
   logoWrapper: {
     alignItems: 'center',
-    marginBottom: 24,
-  },
-  logoInner: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-    borderWidth: 2,
-    borderColor: 'rgba(16, 185, 129, 0.4)',
+    marginBottom: 20,
   },
   brandTitle: {
     fontSize: 30,

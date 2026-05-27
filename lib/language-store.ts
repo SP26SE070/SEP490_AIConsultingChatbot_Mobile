@@ -101,6 +101,8 @@ export const translations = {
 
     // Employee Management
     manageEmployees: 'Quản lý nhân viên',
+    manageTenants: 'Quản lý tổ chức',
+    approveTenant: 'Duyệt tổ chức',
     employeeList: 'Danh sách nhân viên',
     total: 'Tổng',
     activate: 'Kích hoạt',
@@ -276,6 +278,8 @@ export const translations = {
 
     // Employee Management
     manageEmployees: 'Manage Employees',
+    manageTenants: 'Manage Tenants',
+    approveTenant: 'Approve Tenant',
     employeeList: 'Employee List',
     total: 'Total',
     activate: 'Activate',

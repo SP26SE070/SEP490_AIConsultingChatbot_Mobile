@@ -17,7 +17,6 @@ export default function RootLayout() {
           <Stack.Screen name="documents" />
           <Stack.Screen name="analytics" />
           <Stack.Screen name="profile" />
-          <Stack.Screen name="staff" />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
