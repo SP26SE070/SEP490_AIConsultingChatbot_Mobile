@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator,
-  Alert, ScrollView, Modal, Platform
+  Alert, ScrollView, Modal, Animated
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { getProfile, changePassword, updateProfile, sendOtpForContactEmail, updateContactEmail } from '../lib/api/profile';
-import { COLORS } from '../lib/theme';
 import { AppShell } from '../components/layout/AppShell';
 
 export default function ProfileScreen() {
@@ -34,6 +34,7 @@ export default function ProfileScreen() {
 
   // Change Password
   const [changingPassword, setChangingPassword] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -50,7 +51,6 @@ export default function ProfileScreen() {
       setAddress(data.address || '');
       setDateOfBirth(data.dateOfBirth || '');
       
-      // Parse date for picker
       if (data.dateOfBirth) {
         const parts = data.dateOfBirth.split('-');
         if (parts.length === 3) {
@@ -67,7 +67,6 @@ export default function ProfileScreen() {
   }
 
   function validatePhoneNumber(phone: string): boolean {
-    // Vietnamese phone: 10-11 digits, starts with 0
     const phoneRegex = /^0\d{9,10}$/;
     return phoneRegex.test(phone);
   }
@@ -82,19 +81,16 @@ export default function ProfileScreen() {
     if (m < 1 || m > 12) return false;
     if (d < 1 || d > 31) return false;
     
-    // Check valid date
     const date = new Date(y, m - 1, d);
     if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) {
       return false;
     }
     
-    // Check age >= 18
     const today = new Date();
     const age = today.getFullYear() - date.getFullYear();
     const monthDiff = today.getMonth() - date.getMonth();
     const dayDiff = today.getDate() - date.getDate();
     
-    // Calculate exact age
     let actualAge = age;
     if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
       actualAge--;
@@ -104,7 +100,7 @@ export default function ProfileScreen() {
   }
 
   function handleDateConfirm() {
-    setDateError(''); // Clear previous errors
+    setDateError('');
     
     if (!tempYear || !tempMonth || !tempDay) {
       setDateError('Vui lòng nhập đầy đủ ngày tháng năm');
@@ -135,14 +131,12 @@ export default function ProfileScreen() {
       return;
     }
     
-    // Check valid date
     const date = new Date(y, m - 1, d);
     if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) {
-      setDateError('Ngày sinh không hợp lệ (ví dụ: không có ngày 31/02)');
+      setDateError('Ngày sinh không hợp lệ');
       return;
     }
     
-    // Check age >= 18
     const today = new Date();
     const age = today.getFullYear() - date.getFullYear();
     const monthDiff = today.getMonth() - date.getMonth();
@@ -165,7 +159,6 @@ export default function ProfileScreen() {
   }
 
   async function handleUpdateProfile() {
-    // Validate phone number
     if (phoneNumber && !validatePhoneNumber(phoneNumber)) {
       Alert.alert('Lỗi', 'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam (10-11 số, bắt đầu bằng 0)');
       return;
@@ -242,6 +235,7 @@ export default function ProfileScreen() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setShowPasswordForm(false);
     } catch (e: any) {
       Alert.alert('Lỗi', e.message || 'Không thể thay đổi mật khẩu');
     } finally {
@@ -251,62 +245,71 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <AppShell title="Hồ sơ cá nhân" subtitle="Thông tin tài khoản">
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
+      <AppShell title="Hồ sơ" subtitle="Thông tin cá nhân">
+        <View style={styles.loadingContainer}>
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color="#10b981" />
+            <Text style={styles.loadingText}>Đang tải thông tin...</Text>
+          </View>
         </View>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="Hồ sơ cá nhân" subtitle="Quản lý thông tin tài khoản">
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Profile Info */}
-        <View style={styles.card}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {profile?.fullName?.charAt(0)?.toUpperCase() ?? '?'}
-            </Text>
+    <AppShell title="Hồ sơ" subtitle="Quản lý thông tin cá nhân">
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        
+        {/* Profile Header Card */}
+        <View style={styles.headerCard}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {profile?.fullName?.charAt(0)?.toUpperCase() ?? '?'}
+              </Text>
+            </View>
+            <View style={styles.statusBadge}>
+              <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+            </View>
           </View>
-          <Text style={styles.name}>{profile?.fullName ?? 'N/A'}</Text>
-          <Text style={styles.email}>{profile?.email ?? 'N/A'}</Text>
+          <Text style={styles.userName}>{profile?.fullName ?? 'N/A'}</Text>
+          <Text style={styles.userEmail}>{profile?.email ?? 'N/A'}</Text>
+          <View style={styles.roleChip}>
+            <Ionicons name="shield-checkmark" size={14} color="#10b981" />
+            <Text style={styles.roleText}>{profile?.roleName || 'Người dùng'}</Text>
+          </View>
         </View>
 
-        {/* Profile Information */}
-        <View style={styles.infoCard}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
-            {!editingProfile && (
-              <TouchableOpacity onPress={() => setEditingProfile(true)}>
-                <Text style={{ color: '#22c55e', fontSize: 13 }}>Chỉnh sửa</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+        {/* Personal Information Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
           
           {editingProfile ? (
-            <>
+            <View style={styles.editCard}>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Số điện thoại</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="VD: 0123456789"
-                  placeholderTextColor="#64748b"
-                  value={phoneNumber}
-                  onChangeText={setPhoneNumber}
-                  keyboardType="phone-pad"
-                  maxLength={11}
-                />
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="call-outline" size={18} color="#64748b" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="VD: 0123456789"
+                    placeholderTextColor="#64748b"
+                    value={phoneNumber}
+                    onChangeText={setPhoneNumber}
+                    keyboardType="phone-pad"
+                    maxLength={11}
+                  />
+                </View>
                 {phoneNumber && !validatePhoneNumber(phoneNumber) && (
-                  <Text style={styles.errorText}>Số điện thoại không hợp lệ (10-11 số, bắt đầu bằng 0)</Text>
+                  <Text style={styles.errorText}>Số điện thoại không hợp lệ (10-11 số)</Text>
                 )}
               </View>
+
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Ngày sinh</Text>
                 <TouchableOpacity
-                  style={styles.dateButton}
+                  style={styles.inputWrapper}
                   onPress={() => {
-                    // Initialize temp values from current date
                     if (dateOfBirth) {
                       const parts = dateOfBirth.split('-');
                       if (parts.length === 3) {
@@ -324,105 +327,187 @@ export default function ProfileScreen() {
                     setShowDatePicker(true);
                   }}
                 >
-                  <Text style={styles.dateButtonText}>
+                  <Ionicons name="calendar-outline" size={18} color="#64748b" />
+                  <Text style={[styles.input, { paddingVertical: 0 }]}>
                     {dateOfBirth || 'Chọn ngày sinh'}
                   </Text>
                 </TouchableOpacity>
               </View>
+
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Địa chỉ</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Nhập địa chỉ"
-                  placeholderTextColor="#64748b"
-                  value={address}
-                  onChangeText={setAddress}
-                  multiline
-                />
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="location-outline" size={18} color="#64748b" />
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    placeholder="Nhập địa chỉ"
+                    placeholderTextColor="#64748b"
+                    value={address}
+                    onChangeText={setAddress}
+                    multiline
+                  />
+                </View>
               </View>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
-                  style={[styles.changeBtn, { flex: 1, backgroundColor: '#64748b' }]}
+                  style={styles.cancelBtn}
                   onPress={() => {
                     setEditingProfile(false);
                     setPhoneNumber(profile?.phoneNumber || '');
                     setAddress(profile?.address || '');
                     setDateOfBirth(profile?.dateOfBirth || '');
-                    setShowDatePicker(false);
                   }}
                 >
-                  <Text style={styles.changeBtnText}>Hủy</Text>
+                  <Ionicons name="close" size={18} color="#94a3b8" />
+                  <Text style={styles.cancelBtnText}>Hủy</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.changeBtn, { flex: 1 }, updatingProfile && styles.btnDisabled]}
+                  style={[styles.saveBtn, updatingProfile && styles.btnDisabled]}
                   onPress={handleUpdateProfile}
                   disabled={updatingProfile}
                 >
-                  {updatingProfile
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.changeBtnText}>Lưu</Text>
-                  }
+                  {updatingProfile ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark" size={18} color="#fff" />
+                      <Text style={styles.saveBtnText}>Lưu</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
-            </>
+            </View>
           ) : (
-            <>
-              <InfoRow label="Số điện thoại" value={profile?.phoneNumber} />
-              <InfoRow label="Ngày sinh" value={profile?.dateOfBirth} />
-              <InfoRow label="Địa chỉ" value={profile?.address} />
-              <InfoRow label="Vai trò" value={profile?.roleName} />
-            </>
+            <View style={styles.infoCard}>
+              <InfoItem 
+                icon="call-outline" 
+                label="Số điện thoại" 
+                value={profile?.phoneNumber || 'Chưa cập nhật'}
+              />
+              <InfoItem 
+                icon="calendar-outline" 
+                label="Ngày sinh" 
+                value={profile?.dateOfBirth || 'Chưa cập nhật'}
+              />
+              <InfoItem 
+                icon="location-outline" 
+                label="Địa chỉ" 
+                value={profile?.address || 'Chưa cập nhật'}
+              />
+              <TouchableOpacity 
+                style={styles.editBtn}
+                onPress={() => setEditingProfile(true)}
+              >
+                <Ionicons name="create-outline" size={18} color="#10b981" />
+                <Text style={styles.editBtnText}>Chỉnh sửa thông tin</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
-        {/* Contact Email */}
-        <View style={styles.infoCard}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <Text style={styles.sectionTitle}>Email liên hệ</Text>
-            <TouchableOpacity onPress={() => setShowEmailModal(true)}>
-              <Text style={{ color: '#22c55e', fontSize: 13 }}>Cập nhật</Text>
+        {/* Contact Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Liên hệ</Text>
+          <View style={styles.infoCard}>
+            <InfoItem 
+              icon="mail-outline" 
+              label="Email liên hệ" 
+              value={profile?.contactEmail || 'Chưa cập nhật'}
+            />
+            <TouchableOpacity 
+              style={styles.editBtn}
+              onPress={() => setShowEmailModal(true)}
+            >
+              <Ionicons name="create-outline" size={18} color="#10b981" />
+              <Text style={styles.editBtnText}>Cập nhật email</Text>
             </TouchableOpacity>
           </View>
-          <InfoRow label="Email" value={profile?.contactEmail} />
         </View>
 
-        {/* Change Password */}
-        <View style={styles.infoCard}>
-          <Text style={styles.sectionTitle}>Đổi mật khẩu</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Mật khẩu hiện tại"
-            placeholderTextColor="#64748b"
-            secureTextEntry
-            value={currentPassword}
-            onChangeText={setCurrentPassword}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Mật khẩu mới"
-            placeholderTextColor="#64748b"
-            secureTextEntry
-            value={newPassword}
-            onChangeText={setNewPassword}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Xác nhận mật khẩu mới"
-            placeholderTextColor="#64748b"
-            secureTextEntry
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-          />
-          <TouchableOpacity
-            style={[styles.changeBtn, changingPassword && styles.btnDisabled]}
-            onPress={handleChangePassword}
-            disabled={changingPassword}
-          >
-            {changingPassword
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.changeBtnText}>Đổi mật khẩu</Text>
-            }
-          </TouchableOpacity>
+        {/* Security Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Bảo mật</Text>
+          <View style={styles.infoCard}>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => setShowPasswordForm(!showPasswordForm)}
+            >
+              <View style={styles.menuIcon}>
+                <Ionicons name="lock-closed-outline" size={20} color="#10b981" />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>Đổi mật khẩu</Text>
+                <Text style={styles.menuSubtitle}>Cập nhật mật khẩu mới</Text>
+              </View>
+              <Ionicons 
+                name={showPasswordForm ? "chevron-up" : "chevron-forward"} 
+                size={20} 
+                color="#64748b" 
+              />
+            </TouchableOpacity>
+
+            {showPasswordForm && (
+              <View style={styles.passwordForm}>
+                <View style={styles.passwordInputWrapper}>
+                  <Ionicons name="key-outline" size={18} color="#64748b" />
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Mật khẩu hiện tại"
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                  />
+                </View>
+                <View style={styles.passwordInputWrapper}>
+                  <Ionicons name="key-outline" size={18} color="#64748b" />
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Mật khẩu mới"
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                  />
+                </View>
+                <View style={styles.passwordInputWrapper}>
+                  <Ionicons name="key-outline" size={18} color="#64748b" />
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Xác nhận mật khẩu mới"
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={[styles.changePassBtn, changingPassword && styles.btnDisabled]}
+                  onPress={handleChangePassword}
+                  disabled={changingPassword}
+                >
+                  {changingPassword ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                      <Text style={styles.changePassBtnText}>Xác nhận đổi mật khẩu</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* App Info */}
+        <View style={styles.appInfo}>
+          <View style={styles.appInfoIcon}>
+            <Ionicons name="sparkles" size={20} color="#10b981" />
+          </View>
+          <Text style={styles.appName}>AI Chatbot</Text>
+          <Text style={styles.appVersion}>Phiên bản 1.0.0</Text>
         </View>
       </ScrollView>
 
@@ -438,41 +523,48 @@ export default function ProfileScreen() {
           setOtpSent(false);
         }}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Cập nhật email liên hệ</Text>
+        <View style={modalStyles.overlay}>
+          <View style={modalStyles.modal}>
+            <View style={modalStyles.handleBar} />
+            <Text style={modalStyles.title}>Cập nhật email liên hệ</Text>
             
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Email mới</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="example@email.com"
-                placeholderTextColor="#64748b"
-                value={newContactEmail}
-                onChangeText={setNewContactEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                editable={!otpSent}
-              />
+            <View style={modalStyles.inputGroup}>
+              <Text style={modalStyles.label}>Email mới</Text>
+              <View style={modalStyles.inputWrapper}>
+                <Ionicons name="mail-outline" size={18} color="#64748b" />
+                <TextInput
+                  style={modalStyles.input}
+                  placeholder="example@email.com"
+                  placeholderTextColor="#64748b"
+                  value={newContactEmail}
+                  onChangeText={setNewContactEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!otpSent}
+                />
+              </View>
             </View>
 
             {otpSent && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Mã OTP</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Nhập mã OTP"
-                  placeholderTextColor="#64748b"
-                  value={otp}
-                  onChangeText={setOtp}
-                  keyboardType="number-pad"
-                />
+              <View style={modalStyles.inputGroup}>
+                <Text style={modalStyles.label}>Mã OTP</Text>
+                <View style={modalStyles.inputWrapper}>
+                  <Ionicons name="shield-checkmark-outline" size={18} color="#64748b" />
+                  <TextInput
+                    style={modalStyles.input}
+                    placeholder="Nhập mã OTP"
+                    placeholderTextColor="#64748b"
+                    value={otp}
+                    onChangeText={setOtp}
+                    keyboardType="number-pad"
+                  />
+                </View>
               </View>
             )}
 
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+            <View style={modalStyles.buttonRow}>
               <TouchableOpacity
-                style={[styles.changeBtn, { flex: 1, backgroundColor: '#64748b' }]}
+                style={modalStyles.cancelBtn}
                 onPress={() => {
                   setShowEmailModal(false);
                   setNewContactEmail('');
@@ -480,30 +572,38 @@ export default function ProfileScreen() {
                   setOtpSent(false);
                 }}
               >
-                <Text style={styles.changeBtnText}>Hủy</Text>
+                <Text style={modalStyles.cancelBtnText}>Hủy</Text>
               </TouchableOpacity>
               
               {!otpSent ? (
                 <TouchableOpacity
-                  style={[styles.changeBtn, { flex: 1 }, sendingOtp && styles.btnDisabled]}
+                  style={[modalStyles.primaryBtn, sendingOtp && styles.btnDisabled]}
                   onPress={handleSendOtp}
                   disabled={sendingOtp}
                 >
-                  {sendingOtp
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.changeBtnText}>Gửi OTP</Text>
-                  }
+                  {sendingOtp ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="paper-plane" size={16} color="#fff" />
+                      <Text style={modalStyles.primaryBtnText}>Gửi OTP</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
-                  style={[styles.changeBtn, { flex: 1 }, updatingEmail && styles.btnDisabled]}
+                  style={[modalStyles.primaryBtn, updatingEmail && styles.btnDisabled]}
                   onPress={handleUpdateContactEmail}
                   disabled={updatingEmail}
                 >
-                  {updatingEmail
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.changeBtnText}>Xác nhận</Text>
-                  }
+                  {updatingEmail ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                      <Text style={modalStyles.primaryBtnText}>Xác nhận</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               )}
             </View>
@@ -518,15 +618,16 @@ export default function ProfileScreen() {
         animationType="slide"
         onRequestClose={() => setShowDatePicker(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Chọn ngày sinh</Text>
+        <View style={modalStyles.overlay}>
+          <View style={modalStyles.modal}>
+            <View style={modalStyles.handleBar} />
+            <Text style={modalStyles.title}>Chọn ngày sinh</Text>
             
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.inputLabel}>Ngày</Text>
+            <View style={modalStyles.dateRow}>
+              <View style={modalStyles.dateField}>
+                <Text style={modalStyles.label}>Ngày</Text>
                 <TextInput
-                  style={styles.input}
+                  style={modalStyles.input}
                   placeholder="DD"
                   placeholderTextColor="#64748b"
                   value={tempDay}
@@ -535,10 +636,10 @@ export default function ProfileScreen() {
                   maxLength={2}
                 />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.inputLabel}>Tháng</Text>
+              <View style={modalStyles.dateField}>
+                <Text style={modalStyles.label}>Tháng</Text>
                 <TextInput
-                  style={styles.input}
+                  style={modalStyles.input}
                   placeholder="MM"
                   placeholderTextColor="#64748b"
                   value={tempMonth}
@@ -547,10 +648,10 @@ export default function ProfileScreen() {
                   maxLength={2}
                 />
               </View>
-              <View style={{ flex: 1.5 }}>
-                <Text style={styles.inputLabel}>Năm</Text>
+              <View style={[modalStyles.dateField, { flex: 1.5 }]}>
+                <Text style={modalStyles.label}>Năm</Text>
                 <TextInput
-                  style={styles.input}
+                  style={modalStyles.input}
                   placeholder="YYYY"
                   placeholderTextColor="#64748b"
                   value={tempYear}
@@ -562,26 +663,28 @@ export default function ProfileScreen() {
             </View>
 
             {dateError ? (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{dateError}</Text>
+              <View style={modalStyles.errorBox}>
+                <Ionicons name="alert-circle" size={16} color="#f87171" />
+                <Text style={modalStyles.errorText}>{dateError}</Text>
               </View>
             ) : null}
 
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={modalStyles.buttonRow}>
               <TouchableOpacity
-                style={[styles.changeBtn, { flex: 1, backgroundColor: '#64748b' }]}
+                style={modalStyles.cancelBtn}
                 onPress={() => {
                   setShowDatePicker(false);
                   setDateError('');
                 }}
               >
-                <Text style={styles.changeBtnText}>Hủy</Text>
+                <Text style={modalStyles.cancelBtnText}>Hủy</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.changeBtn, { flex: 1 }]}
+                style={modalStyles.primaryBtn}
                 onPress={handleDateConfirm}
               >
-                <Text style={styles.changeBtnText}>Xác nhận</Text>
+                <Ionicons name="checkmark" size={16} color="#fff" />
+                <Text style={modalStyles.primaryBtnText}>Xác nhận</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -591,137 +694,436 @@ export default function ProfileScreen() {
   );
 }
 
-function InfoRow({ label, value }: { label: string; value?: string }) {
+function InfoItem({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value || '—'}</Text>
+    <View style={styles.infoItem}>
+      <View style={styles.infoIconWrap}>
+        <Ionicons name={icon as any} size={18} color="#10b981" />
+      </View>
+      <View style={styles.infoContent}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <Text style={styles.infoValue}>{value}</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
   },
-  headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#f1f5f9' },
-  backText: { color: '#22c55e', fontSize: 14, width: 80 },
-  content: { padding: 16, gap: 16, paddingBottom: 40 },
-  card: {
+  loadingContent: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    color: '#94a3b8',
+    fontSize: 15,
+  },
+  content: {
+    padding: 16,
+    paddingBottom: 40,
+    gap: 20,
+  },
+  headerCard: {
     backgroundColor: '#1e293b',
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#334155',
   },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#22c55e',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  avatarText: {
+    color: '#10b981',
+    fontSize: 36,
+    fontWeight: '700',
+  },
+  statusBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+  },
+  userName: {
+    color: '#f1f5f9',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  userEmail: {
+    color: '#94a3b8',
+    fontSize: 14,
     marginBottom: 12,
   },
-  avatarText: { color: '#fff', fontSize: 28, fontWeight: 'bold' },
-  name: { color: '#f1f5f9', fontSize: 18, fontWeight: '600', marginBottom: 4 },
-  email: { color: '#64748b', fontSize: 13 },
+  roleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  roleText: {
+    color: '#10b981',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  section: {
+    gap: 12,
+  },
+  sectionTitle: {
+    color: '#f1f5f9',
+    fontSize: 16,
+    fontWeight: '700',
+    paddingLeft: 4,
+  },
   infoCard: {
     backgroundColor: '#1e293b',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     borderWidth: 1,
     borderColor: '#334155',
     gap: 12,
   },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
+  editCard: {
+    backgroundColor: '#1e293b',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+    gap: 16,
   },
-  infoLabel: { color: '#94a3b8', fontSize: 13 },
-  infoValue: { color: '#f1f5f9', fontSize: 13, textAlign: 'right', flex: 1 },
-  sectionTitle: { color: '#f1f5f9', fontSize: 15, fontWeight: '600', marginBottom: 4 },
-  input: {
-    backgroundColor: '#0f172a',
-    borderRadius: 10,
-    padding: 12,
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 8,
+  },
+  infoIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoLabel: {
+    color: '#64748b',
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  infoValue: {
     color: '#f1f5f9',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    marginTop: 4,
+  },
+  editBtnText: {
+    color: '#10b981',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  inputGroup: {
+    gap: 8,
+  },
+  inputLabel: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: '#334155',
   },
-  changeBtn: {
-    backgroundColor: '#22c55e',
-    borderRadius: 10,
-    padding: 14,
-    alignItems: 'center',
-    marginTop: 4,
+  input: {
+    flex: 1,
+    color: '#f1f5f9',
+    fontSize: 15,
   },
-  btnDisabled: { opacity: 0.6 },
-  changeBtnText: { color: '#fff', fontWeight: '600' },
-  logoutBtn: {
-    backgroundColor: '#ef4444',
-    borderRadius: 10,
-    padding: 14,
-    alignItems: 'center',
-  },
-  logoutBtnText: { color: '#fff', fontWeight: '600' },
-  inputGroup: { gap: 6 },
-  inputLabel: { color: '#94a3b8', fontSize: 13, fontWeight: '500' },
   errorText: {
-    color: '#ef4444',
+    color: '#f87171',
     fontSize: 12,
     marginTop: 4,
   },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  cancelBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#334155',
+    borderWidth: 1,
+    borderColor: '#475569',
+  },
+  cancelBtnText: {
+    color: '#94a3b8',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  saveBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#10b981',
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 12,
+  },
+  menuIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuContent: {
+    flex: 1,
+  },
+  menuTitle: {
+    color: '#f1f5f9',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  menuSubtitle: {
+    color: '#64748b',
+    fontSize: 13,
+  },
+  passwordForm: {
+    marginTop: 12,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+    gap: 12,
+  },
+  passwordInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  passwordInput: {
+    flex: 1,
+    color: '#f1f5f9',
+    fontSize: 15,
+  },
+  changePassBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#10b981',
+    marginTop: 4,
+  },
+  changePassBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  appInfo: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    gap: 8,
+  },
+  appInfoIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appName: {
+    color: '#f1f5f9',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  appVersion: {
+    color: '#64748b',
+    fontSize: 13,
+  },
+});
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modal: {
+    backgroundColor: '#1e293b',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#475569',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    color: '#f1f5f9',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  input: {
+    flex: 1,
+    color: '#f1f5f9',
+    fontSize: 15,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  dateField: {
+    flex: 1,
+  },
   errorBox: {
-    backgroundColor: '#7f1d1d',
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(248, 113, 113, 0.15)',
+    borderRadius: 10,
     padding: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#ef4444',
+    borderColor: 'rgba(248, 113, 113, 0.3)',
   },
-  dateButton: {
-    backgroundColor: '#0f172a',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  dateButtonText: {
-    color: '#f1f5f9',
-    fontSize: 14,
-  },
-  modalOverlay: {
+  errorText: {
+    color: '#f87171',
+    fontSize: 13,
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#334155',
     alignItems: 'center',
-    padding: 24,
-  },
-  modalContent: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#475569',
   },
-  modalTitle: {
-    color: '#f1f5f9',
-    fontSize: 18,
+  cancelBtnText: {
+    color: '#94a3b8',
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: 20,
-    textAlign: 'center',
+  },
+  primaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#10b981',
+  },
+  primaryBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

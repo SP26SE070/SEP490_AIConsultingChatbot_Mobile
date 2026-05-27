@@ -15,9 +15,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { sendMessage, getConversationHistory, rateMessage } from '../lib/api/chatbot';
 import { getPendingConversation, consumeNewChatRequest } from '../lib/navigation-store';
-import { getAccessToken } from '../lib/auth-store';
 import { COLORS } from '../lib/theme';
 import { AppShell } from '../components/layout/AppShell';
+import { useLanguageStore, translations } from '../lib/language-store';
 
 interface Message {
   id: string;
@@ -36,19 +36,22 @@ interface ChatSourceDocument {
   snippet: string;
 }
 
-const QUICK_PROMPTS = [
-  'Chính sách nghỉ phép',
-  'Quy trình onboard',
-  'Hỗ trợ IT',
-];
-
 export default function ChatbotScreen() {
+  const { language } = useLanguageStore();
+  const t = translations[language];
+  
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  const QUICK_PROMPTS = [
+    language === 'vi' ? 'Chính sách nghỉ phép' : 'Leave policy',
+    language === 'vi' ? 'Quy trình onboard' : 'Onboarding process',
+    language === 'vi' ? 'Hỗ trợ IT' : 'IT Support',
+  ];
 
   useFocusEffect(
     useCallback(() => {
@@ -84,7 +87,7 @@ export default function ChatbotScreen() {
         setMessages([{
           id: 'auth-error',
           role: 'assistant',
-          content: 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.',
+          content: t.sessionExpired,
         }]);
       }
     } finally {
@@ -102,63 +105,74 @@ export default function ChatbotScreen() {
       content,
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: '',
+    };
+
+    setMessages(prev => [...prev, userMessage, assistantMessage]);
     setInput('');
     setSending(true);
 
-    try {
-      const data = await sendMessage(content, conversationId);
-      if (data.conversationId) setConversationId(data.conversationId);
+    if (text) {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.answer || 'Xin lỗi, tôi không thể trả lời lúc này.',
-        sources: data.sources ?? [],
-        rating: null,
-        responseTimeMs: data.responseTimeMs,
-      };
-      setMessages(prev => [...prev, assistantMessage]);
+    try {
+      const result = await sendMessage(content, conversationId);
+      if (result.conversationId && !conversationId) {
+        setConversationId(result.conversationId);
+      }
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === assistantMessage.id
+            ? {
+                ...msg,
+                content: result.response,
+                sources: result.sources,
+                responseTimeMs: result.responseTimeMs,
+              }
+            : msg
+        )
+      );
     } catch (e: any) {
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: e?.status === 401 
-          ? 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.' 
-          : 'Đã xảy ra lỗi. Vui lòng thử lại.',
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === assistantMessage.id
+            ? { ...msg, content: t.error + ': ' + (e.message || 'Unknown error') }
+            : msg
+        )
+      );
     } finally {
       setSending(false);
+      flatListRef.current?.scrollToEnd({ animated: true });
     }
   }
 
   async function handleRate(messageId: string, rating: 'helpful' | 'not-helpful') {
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === messageId ? { ...msg, rating } : msg
+      )
+    );
     try {
       await rateMessage(messageId, rating);
-      setMessages(prev =>
-        prev.map(msg =>
-          msg.id === messageId ? { ...msg, rating } : msg
-        )
-      );
     } catch (e) {
-      console.warn('Failed to rate message:', e);
+      console.warn('Rating failed:', e);
     }
   }
 
   const canSend = input.trim().length > 0 && !sending;
 
   return (
-    <AppShell
-      title="Trò chuyện AI"
-      subtitle="Hỏi về chính sách, HR, IT..."
-    >
+    <AppShell title={t.chat} subtitle={language === 'vi' ? 'Hỏi về chính sách, HR, IT...' : 'Ask about policies, HR, IT...'}>
       <View style={styles.chatBody}>
         <View style={styles.messagesWrapper}>
           {historyLoading ? (
             <View style={styles.centerLoader}>
-              <ActivityIndicator size="large" color={COLORS.accent} />
-              <Text style={styles.centerLoaderText}>Đang tải hội thoại...</Text>
+              <ActivityIndicator size="large" color="#10b981" />
+              <Text style={styles.centerLoaderText}>{t.loading}</Text>
             </View>
           ) : (
             <FlatList
@@ -173,19 +187,17 @@ export default function ChatbotScreen() {
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               onContentSizeChange={() => {
-                if (flatListRef.current) {
-                  flatListRef.current.scrollToEnd({ animated: true });
-                }
+                flatListRef.current?.scrollToEnd({ animated: true });
               }}
               ListEmptyComponent={
                 <View style={styles.emptyState}>
                   <View style={styles.emptyIconWrap}>
-                    <Ionicons name="chatbubbles" size={40} color={COLORS.accent} />
+                    <Ionicons name="chatbubbles" size={40} color="#10b981" />
                   </View>
-                  <Text style={styles.emptyTitle}>Xin chào!</Text>
-                  <Text style={styles.emptyText}>
-                    Hỏi tôi về chính sách công ty, HR, IT hoặc chọn gợi ý bên dưới.
+                  <Text style={styles.emptyTitle}>
+                    {language === 'vi' ? 'Xin chào!' : 'Hello!'}
                   </Text>
+                  <Text style={styles.emptyText}>{t.askAnything}</Text>
                   <View style={styles.promptRow}>
                     {QUICK_PROMPTS.map(prompt => (
                       <TouchableOpacity
@@ -209,7 +221,7 @@ export default function ChatbotScreen() {
                 >
                   {item.role === 'assistant' && (
                     <View style={styles.avatar}>
-                      <Ionicons name="sparkles" size={14} color={COLORS.accent} />
+                      <Ionicons name="sparkles" size={14} color="#10b981" />
                     </View>
                   )}
                   <View style={styles.messageColumn}>
@@ -233,14 +245,17 @@ export default function ChatbotScreen() {
                     {item.role === 'assistant' && item.sources && item.sources.length > 0 && (
                       <View style={styles.sourcesSection}>
                         <View style={styles.sourcesTitleRow}>
-                          <Ionicons name="library-outline" size={12} color={COLORS.textMuted} />
-                          <Text style={styles.sourcesTitle}> Nguồn tham khảo</Text>
+                          <Ionicons name="library-outline" size={12} color="#64748b" />
+                          <Text style={styles.sourcesTitle}> {t.sources}</Text>
                         </View>
                         {item.sources.slice(0, 3).map((source, idx) => (
                           <View key={idx} style={styles.sourceItem}>
-                            <Text style={styles.sourceTitle} numberOfLines={1}>
-                              📄 {source.documentTitle}
-                            </Text>
+                            <View style={styles.sourceTitleRow}>
+                              <Ionicons name="document-text-outline" size={12} color="#10b981" />
+                              <Text style={styles.sourceTitle} numberOfLines={1}>
+                                {source.documentTitle}
+                              </Text>
+                            </View>
                             <Text style={styles.sourceSnippet} numberOfLines={2}>
                               {source.snippet}
                             </Text>
@@ -251,9 +266,12 @@ export default function ChatbotScreen() {
 
                     {/* Response time */}
                     {item.role === 'assistant' && item.responseTimeMs && (
-                      <Text style={styles.responseTime}>
-                        Phản hồi trong {item.responseTimeMs}ms
-                      </Text>
+                      <View style={styles.metaRow}>
+                        <Ionicons name="time-outline" size={10} color="#64748b" />
+                        <Text style={styles.responseTime}>
+                          {t.responseTime}: {item.responseTimeMs}{t.ms}
+                        </Text>
+                      </View>
                     )}
 
                     {/* Rating */}
@@ -265,21 +283,28 @@ export default function ChatbotScreen() {
                               style={styles.rateBtn}
                               onPress={() => handleRate(item.id, 'helpful')}
                             >
-                              <Ionicons name="thumbs-up-outline" size={14} color={COLORS.accent} />
-                              <Text style={styles.rateBtnText}>Hữu ích</Text>
+                              <Ionicons name="thumbs-up-outline" size={14} color="#10b981" />
+                              <Text style={styles.rateBtnText}>{t.helpful}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                               style={styles.rateBtn}
                               onPress={() => handleRate(item.id, 'not-helpful')}
                             >
-                              <Ionicons name="thumbs-down-outline" size={14} color={COLORS.textMuted} />
-                              <Text style={styles.rateBtnTextMuted}>Không</Text>
+                              <Ionicons name="thumbs-down-outline" size={14} color="#64748b" />
+                              <Text style={styles.rateBtnTextMuted}>{t.notHelpful}</Text>
                             </TouchableOpacity>
                           </>
                         ) : (
-                          <Text style={styles.ratedText}>
-                            {item.rating === 'helpful' ? '👍 Cảm ơn!' : '📝 Đã ghi nhận'}
-                          </Text>
+                          <View style={styles.ratedBadge}>
+                            <Ionicons 
+                              name={item.rating === 'helpful' ? "checkmark-circle" : "chatbox-ellipses"} 
+                              size={14} 
+                              color="#10b981" 
+                            />
+                            <Text style={styles.ratedText}>
+                              {item.rating === 'helpful' ? t.thanks : t.feedbackReceived}
+                            </Text>
+                          </View>
                         )}
                       </View>
                     )}
@@ -292,11 +317,11 @@ export default function ChatbotScreen() {
           {sending && (
             <View style={styles.typingRow}>
               <View style={styles.avatar}>
-                <Ionicons name="sparkles" size={14} color={COLORS.accent} />
+                <Ionicons name="sparkles" size={14} color="#10b981" />
               </View>
               <View style={styles.typingBubble}>
-                <ActivityIndicator size="small" color={COLORS.accent} />
-                <Text style={styles.typingText}>Đang suy nghĩ...</Text>
+                <ActivityIndicator size="small" color="#10b981" />
+                <Text style={styles.typingText}>{t.thinking}</Text>
               </View>
             </View>
           )}
@@ -310,8 +335,8 @@ export default function ChatbotScreen() {
             <View style={styles.inputCard}>
               <TextInput
                 style={styles.input}
-                placeholder="Nhập câu hỏi của bạn..."
-                placeholderTextColor={COLORS.textDim}
+                placeholder={t.chatPlaceholder}
+                placeholderTextColor="#64748b"
                 value={input}
                 onChangeText={setInput}
                 multiline
@@ -325,7 +350,7 @@ export default function ChatbotScreen() {
                 <Ionicons name="arrow-up" size={20} color="#fff" />
               </Pressable>
             </View>
-            <Text style={styles.charCount}>{input.length}/500 ký tự</Text>
+            <Text style={styles.charCount}>{input.length}/500</Text>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -359,7 +384,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   centerLoaderText: {
-    color: COLORS.textMuted,
+    color: '#94a3b8',
     fontSize: 14,
   },
   emptyState: {
@@ -367,46 +392,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.accentSoft,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
+    marginBottom: 24,
+    borderWidth: 3,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   emptyTitle: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 8,
+    color: '#f1f5f9',
+    marginBottom: 10,
   },
   emptyText: {
     fontSize: 15,
-    color: COLORS.textMuted,
+    color: '#94a3b8',
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
+    lineHeight: 24,
+    marginBottom: 28,
+    paddingHorizontal: 20,
   },
   promptRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
   },
   promptChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     borderRadius: 20,
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   promptChipText: {
     fontSize: 13,
-    color: COLORS.accent,
+    color: '#10b981',
     fontWeight: '600',
   },
   messageRow: {
@@ -424,38 +450,38 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: COLORS.accentSoft,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: 10,
     marginTop: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   messageBubble: {
     flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
     maxWidth: '100%',
   },
   userBubble: {
-    backgroundColor: COLORS.userBubble,
+    backgroundColor: '#10b981',
     borderBottomRightRadius: 6,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   assistantBubble: {
-    backgroundColor: COLORS.assistantBubble,
+    backgroundColor: '#1e293b',
     borderBottomLeftRadius: 6,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#334155',
   },
   messageText: {
     fontSize: 15,
@@ -465,7 +491,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   assistantText: {
-    color: COLORS.text,
+    color: '#f1f5f9',
   },
   typingRow: {
     flexDirection: 'row',
@@ -480,105 +506,122 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 18,
-    backgroundColor: COLORS.assistantBubble,
+    backgroundColor: '#1e293b',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#334155',
   },
   typingText: {
-    color: COLORS.textMuted,
+    color: '#94a3b8',
     fontSize: 13,
   },
   inputSection: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 12,
-    backgroundColor: COLORS.surface,
+    paddingTop: 12,
+    paddingBottom: 16,
+    backgroundColor: '#0f172a',
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: '#1e293b',
   },
   inputCard: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 10,
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: 22,
+    gap: 12,
+    backgroundColor: '#1e293b',
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingLeft: 16,
-    paddingRight: 6,
-    paddingVertical: 6,
+    borderColor: '#334155',
+    paddingLeft: 18,
+    paddingRight: 8,
+    paddingVertical: 8,
   },
   input: {
     flex: 1,
-    color: COLORS.text,
-    fontSize: 15,
+    color: '#f1f5f9',
+    fontSize: 16,
     maxHeight: 120,
-    paddingVertical: 10,
-    lineHeight: 20,
+    paddingVertical: 8,
+    lineHeight: 22,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.accent,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#10b981',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   sendButtonDisabled: {
-    backgroundColor: COLORS.surfaceLight,
-    opacity: 0.6,
+    backgroundColor: '#334155',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   charCount: {
     textAlign: 'right',
-    color: COLORS.textDim,
+    color: '#64748b',
     fontSize: 11,
     marginTop: 6,
     marginRight: 4,
   },
   sourcesSection: {
     marginTop: 8,
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: '#1e293b',
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#334155',
   },
   sourcesTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    gap: 6,
+    marginBottom: 8,
   },
   sourcesTitle: {
     fontSize: 11,
-    color: COLORS.textMuted,
+    color: '#64748b',
     fontWeight: '600',
   },
   sourceItem: {
-    marginBottom: 6,
+    marginBottom: 8,
+  },
+  sourceTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
   },
   sourceTitle: {
     fontSize: 12,
-    color: COLORS.accent,
+    color: '#10b981',
     fontWeight: '600',
-    marginBottom: 2,
+    flex: 1,
   },
   sourceSnippet: {
     fontSize: 11,
-    color: COLORS.textMuted,
+    color: '#94a3b8',
     lineHeight: 16,
+    marginLeft: 18,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
   },
   responseTime: {
     fontSize: 10,
-    color: COLORS.textDim,
-    marginTop: 4,
-    marginLeft: 4,
+    color: '#64748b',
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginTop: 6,
-    marginLeft: 4,
   },
   rateBtn: {
     flexDirection: 'row',
@@ -587,22 +630,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 14,
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#1e293b',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#334155',
   },
   rateBtnText: {
     fontSize: 12,
-    color: COLORS.accent,
+    color: '#10b981',
     fontWeight: '500',
   },
   rateBtnTextMuted: {
     fontSize: 12,
-    color: COLORS.textMuted,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  ratedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
   },
   ratedText: {
     fontSize: 12,
-    color: COLORS.textDim,
-    fontStyle: 'italic',
+    color: '#10b981',
+    fontWeight: '500',
   },
 });

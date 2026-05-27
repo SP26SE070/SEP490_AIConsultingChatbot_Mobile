@@ -9,7 +9,16 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="splash" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="chatbot" />
+          <Stack.Screen name="history" />
+          <Stack.Screen name="documents" />
+          <Stack.Screen name="analytics" />
+          <Stack.Screen name="profile" />
+          <Stack.Screen name="staff" />
+        </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

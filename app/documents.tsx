@@ -7,9 +7,9 @@ import * as WebBrowser from 'expo-web-browser';
 import * as documentPicker from 'expo-document-picker';
 import { getDocuments, getDocumentUrl, uploadDocument } from '../lib/api/documents';
 import { isRole } from '../lib/auth-store';
-import { COLORS } from '../lib/theme';
 import { AppShell } from '../components/layout/AppShell';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguageStore, translations } from '../lib/language-store';
 
 interface Document {
   id: string;
@@ -22,9 +22,10 @@ interface Document {
   visibility: string;
 }
 
-const ACCEPTED_TYPES = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'text/markdown'];
-
 export default function DocumentsScreen() {
+  const { language } = useLanguageStore();
+  const t = translations[language];
+  
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +51,7 @@ export default function DocumentsScreen() {
       const list = Array.isArray(data) ? data : (data.content ?? []);
       setDocuments(list);
     } catch (e: any) {
-      setError('Không thể tải danh sách tài liệu');
+      setError(t.cannotLoadData);
     } finally {
       setLoading(false);
     }
@@ -64,10 +65,10 @@ export default function DocumentsScreen() {
       setShowUploadModal(false);
       setUploadTitle('');
       setUploadFile(null);
-      Alert.alert('Thành công', 'Tài liệu đã được tải lên thành công!');
+      Alert.alert(t.success, t.uploadSuccess);
       loadDocuments();
     } catch (e: any) {
-      Alert.alert('Lỗi', e.message || 'Không thể tải lên tài liệu');
+      Alert.alert(t.error, e.message || t.uploadError);
     } finally {
       setUploading(false);
     }
@@ -89,13 +90,13 @@ export default function DocumentsScreen() {
         });
       }
     } catch (e) {
-      Alert.alert('Lỗi', 'Không thể chọn file');
+      Alert.alert(t.error, t.selectFile);
     }
   }
 
   function formatDate(dateStr: string) {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('vi-VN', {
+    return date.toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -115,11 +116,11 @@ export default function DocumentsScreen() {
   }
 
   function getFileIcon(fileType: string) {
-    if (fileType.includes('pdf')) return '📄';
-    if (fileType.includes('word') || fileType.includes('doc')) return '📝';
-    if (fileType.includes('sheet') || fileType.includes('excel')) return '📊';
-    if (fileType.includes('text')) return '📃';
-    return '📎';
+    if (fileType.includes('pdf')) return 'document';
+    if (fileType.includes('word') || fileType.includes('doc')) return 'document-text';
+    if (fileType.includes('sheet') || fileType.includes('excel')) return 'grid';
+    if (fileType.includes('text') || fileType.includes('markdown')) return 'file-tray-stacked';
+    return 'attach';
   }
 
   async function handleOpenDocument(documentId: string) {
@@ -127,14 +128,14 @@ export default function DocumentsScreen() {
       const url = await getDocumentUrl(documentId);
       await WebBrowser.openBrowserAsync(url);
     } catch (e) {
-      Alert.alert('Lỗi', 'Không thể mở tài liệu. Vui lòng thử lại.');
+      Alert.alert(t.error, t.error);
     }
   }
 
   return (
     <AppShell
-      title="Tài liệu"
-      subtitle="Tài liệu nội bộ công ty"
+      title={t.documents}
+      subtitle={language === 'vi' ? 'Tài liệu nội bộ công ty' : 'Company Internal Documents'}
       headerRight={
         canUpload ? (
           <TouchableOpacity
@@ -148,16 +149,21 @@ export default function DocumentsScreen() {
     >
       {loading && (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
+          <ActivityIndicator size="large" color="#10b981" />
+          <Text style={styles.loadingText}>{t.loading}</Text>
         </View>
       )}
 
       {error && (
         <View style={styles.centered}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadDocuments}>
-            <Text style={styles.retryText}>Thử lại</Text>
-          </TouchableOpacity>
+          <View style={styles.errorCard}>
+            <Ionicons name="alert-circle-outline" size={48} color="#f87171" />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadDocuments}>
+              <Ionicons name="refresh" size={18} color="#fff" />
+              <Text style={styles.retryText}>{t.retry}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -168,39 +174,56 @@ export default function DocumentsScreen() {
           contentContainerStyle={styles.list}
           ListEmptyComponent={
             <View style={styles.centered}>
-              <Text style={styles.emptyText}>Chưa có tài liệu nào</Text>
+              <View style={styles.emptyCard}>
+                <View style={styles.emptyIconWrap}>
+                  <Ionicons name="folder-outline" size={44} color="#10b981" />
+                </View>
+                <Text style={styles.emptyTitle}>{t.noDocuments}</Text>
+                <Text style={styles.emptyText}>{t.addDocuments}</Text>
+              </View>
             </View>
           }
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.documentItem}
               onPress={() => handleOpenDocument(item.id)}
+              activeOpacity={0.8}
             >
-              <View style={styles.documentRow}>
-                <Text style={styles.fileIcon}>{getFileIcon(item.fileType)}</Text>
-                <View style={styles.documentInfo}>
-                  <View style={styles.titleRow}>
-                    <Text style={styles.documentTitle} numberOfLines={1}>
-                      {item.documentTitle || item.originalFileName}
-                    </Text>
-                    {isNew(item.uploadedAt) && (
-                      <View style={styles.newBadge}>
-                        <Text style={styles.newBadgeText}>MỚI</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.documentMeta}>
-                    {formatSize(item.fileSize)} • {formatDate(item.uploadedAt)}
+              <View style={styles.fileIconWrap}>
+                <Ionicons name={getFileIcon(item.fileType) as any} size={24} color="#10b981" />
+              </View>
+              <View style={styles.documentInfo}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.documentTitle} numberOfLines={1}>
+                    {item.documentTitle || item.originalFileName}
                   </Text>
+                  {isNew(item.uploadedAt) && (
+                    <View style={styles.newBadge}>
+                      <Text style={styles.newBadgeText}>{t.new}</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.documentMeta}>
+                  {formatSize(item.fileSize)} • {formatDate(item.uploadedAt)}
+                </Text>
+                <View style={styles.statusRow}>
+                  <Ionicons 
+                    name={item.embeddingStatus === 'COMPLETED' ? "checkmark-circle" : "time-outline"} 
+                    size={12} 
+                    color={item.embeddingStatus === 'COMPLETED' ? '#22c55e' : '#f59e0b'} 
+                  />
                   <Text style={[
                     styles.embeddingStatus,
                     item.embeddingStatus === 'COMPLETED' ? styles.statusCompleted : styles.statusPending
                   ]}>
-                    {item.embeddingStatus === 'COMPLETED' ? '✅ Đã xử lý' : '⏳ Đang xử lý'}
+                    {item.embeddingStatus === 'COMPLETED' 
+                      ? (language === 'vi' ? 'Đã xử lý' : 'Processed')
+                      : (language === 'vi' ? 'Đang xử lý' : 'Processing')
+                    }
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textDim} />
               </View>
+              <Ionicons name="chevron-forward" size={20} color="#475569" />
             </TouchableOpacity>
           )}
         />
@@ -215,40 +238,47 @@ export default function DocumentsScreen() {
       >
         <View style={modalStyles.overlay}>
           <View style={modalStyles.modal}>
+            <View style={modalStyles.handleBar} />
             <View style={modalStyles.modalHeader}>
-              <Text style={modalStyles.modalTitle}>Tải lên tài liệu</Text>
+              <Text style={modalStyles.modalTitle}>{t.uploadDocument}</Text>
               <Pressable onPress={() => setShowUploadModal(false)}>
-                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+                <Ionicons name="close" size={24} color="#64748b" />
               </Pressable>
             </View>
 
-            <Text style={modalStyles.label}>Tiêu đề tài liệu</Text>
+            <Text style={modalStyles.label}>{t.documentTitle}</Text>
             <TextInput
               style={modalStyles.input}
-              placeholder="Nhập tiêu đề..."
-              placeholderTextColor={COLORS.textDim}
+              placeholder={language === 'vi' ? 'Nhập tiêu đề...' : 'Enter title...'}
+              placeholderTextColor="#64748b"
               value={uploadTitle}
               onChangeText={setUploadTitle}
             />
 
-            <Text style={modalStyles.label}>File (PDF, Word, Text)</Text>
+            <Text style={modalStyles.label}>{language === 'vi' ? 'File (PDF, Word, Text)' : 'File (PDF, Word, Text)'}</Text>
             <TouchableOpacity style={modalStyles.filePicker} onPress={pickDocument}>
-              <Ionicons name="document-attach-outline" size={24} color={COLORS.accent} />
+              <Ionicons name="document-attach-outline" size={24} color="#10b981" />
               <Text style={modalStyles.filePickerText}>
-                {uploadFile ? uploadFile.name : 'Chọn file...'}
+                {uploadFile ? uploadFile.name : (language === 'vi' ? 'Chọn file...' : 'Select file...')}
               </Text>
             </TouchableOpacity>
 
             <View style={modalStyles.actions}>
               <TouchableOpacity
-                style={[modalStyles.submitBtn, (!uploadFile || !uploadTitle.trim() || uploading) && modalStyles.submitBtnDisabled]}
+                style={[
+                  modalStyles.submitBtn, 
+                  (!uploadFile || !uploadTitle.trim() || uploading) && modalStyles.submitBtnDisabled
+                ]}
                 onPress={handleUpload}
                 disabled={!uploadFile || !uploadTitle.trim() || uploading}
               >
                 {uploading ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={modalStyles.submitBtnText}>Tải lên</Text>
+                  <View style={modalStyles.submitBtnContent}>
+                    <Ionicons name="cloud-upload" size={18} color="#fff" />
+                    <Text style={modalStyles.submitBtnText}>{t.upload}</Text>
+                  </View>
                 )}
               </TouchableOpacity>
             </View>
@@ -260,37 +290,140 @@ export default function DocumentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  errorText: { color: COLORS.danger, fontSize: 15, textAlign: 'center', marginBottom: 16 },
-  retryButton: { backgroundColor: COLORS.accent, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10 },
-  retryText: { color: '#fff', fontWeight: '600' },
-  emptyText: { color: COLORS.textMuted, fontSize: 15, textAlign: 'center' },
-  list: { padding: 16, gap: 12 },
-  documentItem: {
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+  centered: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    padding: 24 
   },
-  documentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  fileIcon: { fontSize: 28 },
-  documentInfo: { flex: 1 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  documentTitle: { color: COLORS.text, fontSize: 14, fontWeight: '600', flex: 1 },
-  newBadge: { backgroundColor: COLORS.accent, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  newBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-  documentMeta: { color: COLORS.textMuted, fontSize: 12, marginBottom: 4 },
-  embeddingStatus: { fontSize: 12 },
-  statusCompleted: { color: COLORS.accent },
-  statusPending: { color: '#f59e0b' },
-  uploadBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: COLORS.accent,
+  loadingText: {
+    color: '#94a3b8',
+    fontSize: 15,
+    marginTop: 12,
+  },
+  errorCard: {
+    alignItems: 'center',
+    gap: 16,
+    backgroundColor: '#1e293b',
+    padding: 28,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  errorText: { 
+    color: '#f87171', 
+    fontSize: 15, 
+    textAlign: 'center' 
+  },
+  retryButton: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#10b981', 
+    paddingHorizontal: 24, 
+    paddingVertical: 12, 
+    borderRadius: 12 
+  },
+  retryText: { 
+    color: '#fff', 
+    fontWeight: '600', 
+    fontSize: 15 
+  },
+  emptyCard: {
+    alignItems: 'center',
+    gap: 12,
+    padding: 20,
+  },
+  emptyIconWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  emptyTitle: { 
+    color: '#f1f5f9', 
+    fontSize: 18, 
+    fontWeight: '700' 
+  },
+  emptyText: { 
+    color: '#94a3b8', 
+    fontSize: 14, 
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  list: { padding: 16, gap: 12 },
+  documentItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#1e293b',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#334155',
+    gap: 14,
+  },
+  fileIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  documentInfo: { flex: 1, minWidth: 0 },
+  titleRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 8, 
+    marginBottom: 6 
+  },
+  documentTitle: { 
+    color: '#f1f5f9', 
+    fontSize: 15, 
+    fontWeight: '600', 
+    flex: 1 
+  },
+  newBadge: { 
+    backgroundColor: '#10b981', 
+    paddingHorizontal: 8, 
+    paddingVertical: 3, 
+    borderRadius: 6 
+  },
+  newBadgeText: { 
+    color: '#fff', 
+    fontSize: 10, 
+    fontWeight: 'bold' 
+  },
+  documentMeta: { 
+    color: '#64748b', 
+    fontSize: 12, 
+    marginBottom: 6 
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  embeddingStatus: { fontSize: 12 },
+  statusCompleted: { color: '#22c55e' },
+  statusPending: { color: '#f59e0b' },
+  uploadBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#10b981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
 });
 
@@ -301,11 +434,19 @@ const modalStyles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modal: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#1e293b',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 40,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#475569',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -314,55 +455,66 @@ const modalStyles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    color: COLORS.text,
+    color: '#f1f5f9',
   },
   label: {
     fontSize: 13,
-    color: COLORS.textMuted,
+    color: '#94a3b8',
     fontWeight: '600',
     marginBottom: 8,
-    marginTop: 12,
+    marginTop: 16,
   },
   input: {
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: '#0f172a',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    color: COLORS.text,
+    borderColor: '#334155',
+    color: '#f1f5f9',
     fontSize: 15,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
   filePicker: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: '#0f172a',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#334155',
     borderStyle: 'dashed',
-    padding: 16,
+    padding: 18,
   },
   filePickerText: {
     flex: 1,
-    color: COLORS.text,
+    color: '#f1f5f9',
     fontSize: 14,
   },
   actions: {
     marginTop: 24,
   },
   submitBtn: {
-    backgroundColor: COLORS.accent,
-    borderRadius: 12,
-    paddingVertical: 14,
+    backgroundColor: '#10b981',
+    borderRadius: 14,
+    paddingVertical: 16,
     alignItems: 'center',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   submitBtnDisabled: {
-    backgroundColor: COLORS.surfaceLight,
-    opacity: 0.6,
+    backgroundColor: '#334155',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   submitBtnText: {
     color: '#fff',

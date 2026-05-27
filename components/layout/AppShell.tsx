@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,12 @@ import {
   TouchableOpacity,
   Pressable,
   Animated,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, LAYOUT } from '../../lib/theme';
 import { AppSidebar } from './AppSidebar';
+import { LanguageDropdown } from '../LanguageDropdown';
 
 interface AppShellProps {
   title: string;
@@ -34,7 +34,7 @@ export function AppShell({ title, subtitle, children, headerRight }: AppShellPro
     }
     Animated.timing(slideAnim, {
       toValue: drawerOpen ? 0 : -LAYOUT.sidebarWidth,
-      duration: 220,
+      duration: 250,
       useNativeDriver: false,
     }).start();
   }, [drawerOpen, isTablet, slideAnim]);
@@ -47,20 +47,18 @@ export function AppShell({ title, subtitle, children, headerRight }: AppShellPro
     setDrawerOpen(true);
   }
 
-  const sidebar = (
-    <View style={[styles.sidebarContainer, { width: LAYOUT.sidebarWidth }]}>
-      <SafeAreaView style={styles.sidebarSafe} edges={['top', 'bottom', 'left']}>
-        <View style={styles.sidebarInner}>
-          <AppSidebar onNavigate={closeDrawer} />
-        </View>
-      </SafeAreaView>
-    </View>
-  );
-
   return (
     <SafeAreaView style={styles.root} edges={['top', 'right', 'bottom']}>
       <View style={styles.row}>
-        {isTablet && sidebar}
+        {isTablet && (
+          <View style={styles.sidebarContainer}>
+            <SafeAreaView style={styles.sidebarSafe} edges={['top', 'bottom', 'left']}>
+              <View style={styles.sidebarInner}>
+                <AppSidebar onNavigate={closeDrawer} />
+              </View>
+            </SafeAreaView>
+          </View>
+        )}
 
         {!isTablet && drawerOpen && (
           <Pressable style={styles.overlay} onPress={closeDrawer} />
@@ -90,7 +88,7 @@ export function AppShell({ title, subtitle, children, headerRight }: AppShellPro
                   onPress={openDrawer}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="menu" size={24} color={COLORS.text} />
+                  <Ionicons name="menu" size={22} color="#f1f5f9" />
                 </TouchableOpacity>
               )}
               <View style={styles.titleBlock}>
@@ -100,7 +98,10 @@ export function AppShell({ title, subtitle, children, headerRight }: AppShellPro
                 ) : null}
               </View>
             </View>
-            {headerRight ? <View style={styles.headerRight}>{headerRight}</View> : null}
+            <View style={styles.headerActions}>
+              <LanguageDropdown />
+              {headerRight && <View style={styles.headerRight}>{headerRight}</View>}
+            </View>
           </View>
 
           <View style={styles.content}>{children}</View>
@@ -113,20 +114,24 @@ export function AppShell({ title, subtitle, children, headerRight }: AppShellPro
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#0f172a',
   },
   row: {
     flex: 1,
     flexDirection: 'row',
   },
   sidebarContainer: {
+    width: LAYOUT.sidebarWidth,
     flexShrink: 0,
+    borderRightWidth: 1,
+    borderRightColor: '#1e293b',
   },
   sidebarSafe: {
     flex: 1,
   },
   sidebarInner: {
     flex: 1,
+    backgroundColor: '#151f32',
   },
   drawer: {
     position: 'absolute',
@@ -134,15 +139,15 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     zIndex: 100,
-    elevation: 16,
+    elevation: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 4, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
+    shadowOffset: { width: 8, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     zIndex: 99,
   },
   main: {
@@ -154,19 +159,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.surface,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-      },
-      android: { elevation: 2 },
-    }),
+    borderBottomColor: '#1e293b',
+    backgroundColor: '#0f172a',
   },
   topBarLeft: {
     flexDirection: 'row',
@@ -176,33 +172,39 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   menuBtn: {
-    width: 40,
-    height: 40,
+    width: 42,
+    height: 42,
     borderRadius: 12,
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: '#1e293b',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#334155',
   },
   titleBlock: {
     flex: 1,
     minWidth: 0,
   },
   pageTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    color: COLORS.text,
+    color: '#f1f5f9',
   },
   pageSubtitle: {
     fontSize: 13,
-    color: COLORS.textMuted,
+    color: '#94a3b8',
     marginTop: 2,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   headerRight: {
-    marginLeft: 8,
+    marginLeft: 4,
   },
   content: {
     flex: 1,
+    backgroundColor: '#0f172a',
   },
 });
