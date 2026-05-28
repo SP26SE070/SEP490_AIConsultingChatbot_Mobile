@@ -57,6 +57,9 @@ export const translations = {
     analytics: 'Phân tích',
     profile: 'Hồ sơ',
     newChat: 'Tạo cuộc trò chuyện mới',
+    manageEmployees: 'Quản lý nhân viên',
+    approveTenant: 'Duyệt tổ chức',
+    subscription: 'ĐĂNG KÝ GÓI',
 
     // App
     appTitle: 'AI Chatbot',
@@ -293,6 +296,9 @@ export const translations = {
     createdAt: 'Created At',
     lastLogin: 'Last Login',
     noEmployees: 'No employees found',
+
+    // Subscription
+    subscription: 'SUBSCRIPTION',
 
     // Chat
     chatPlaceholder: 'Enter your message...',

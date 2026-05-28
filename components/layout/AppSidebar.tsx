@@ -40,8 +40,8 @@ const ADMIN_NAV: NavItem[] = [
   { href: '/history', labelKey: 'history', icon: 'time-outline', iconActive: 'time' },
   { href: '/documents', labelKey: 'documents', icon: 'document-text-outline', iconActive: 'document-text' },
   { href: '/analytics', labelKey: 'analytics', icon: 'analytics-outline', iconActive: 'analytics' },
-  { href: '/staff', labelKey: 'manageEmployees', icon: 'people-outline', iconActive: 'people' },
-  { href: '/settings', labelKey: 'settings', icon: 'settings-outline', iconActive: 'settings' },
+  { href: '/admin/employees', labelKey: 'manageEmployees', icon: 'people-outline', iconActive: 'people' },
+  { href: '/admin/subscription', labelKey: 'subscription', icon: 'card-outline', iconActive: 'card' },
 ];
 
 interface AppSidebarProps {
@@ -250,7 +250,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
                         color={active ? '#10b981' : '#64748b'}
                       />
                     </View>
-                    <Text style={[styles.navLabel, active && styles.navLabelActive]}>
+                    <Text style={[styles.navLabel, active && styles.navLabelActive, item.labelKey === 'subscription' && styles.navLabelUppercase]}>
                       {t[item.labelKey as keyof typeof t] || item.labelKey}
                     </Text>
                     {active && <View style={styles.activeIndicator} />}
@@ -407,6 +407,10 @@ const styles = StyleSheet.create({
   navLabelActive: {
     color: '#f1f5f9',
     fontWeight: '600',
+  },
+  navLabelUppercase: {
+    letterSpacing: 0.5,
+    fontSize: 13,
   },
   activeIndicator: {
     position: 'absolute',

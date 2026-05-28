@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, LAYOUT } from '../../lib/theme';
 import { AppSidebar } from './AppSidebar';
-import { LanguageDropdown } from '../LanguageDropdown';
+import { HeaderDropdown } from '../HeaderDropdown';
 
 interface AppShellProps {
   title: string;
@@ -99,8 +99,7 @@ export function AppShell({ title, subtitle, children, headerRight }: AppShellPro
               </View>
             </View>
             <View style={styles.headerActions}>
-              <LanguageDropdown />
-              {headerRight && <View style={styles.headerRight}>{headerRight}</View>}
+              <HeaderDropdown />
             </View>
           </View>
 
