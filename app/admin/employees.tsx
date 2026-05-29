@@ -62,8 +62,10 @@ export default function AdminEmployeesScreen() {
   const [editForm, setEditForm] = useState({ fullName: '', phone: '', departmentName: '' });
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [rolePermissions, setRolePermissions] = useState<string[]>([]);
+  const [pendingPermissions, setPendingPermissions] = useState<string[]>([]); // Chờ lưu
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [hasPendingChanges, setHasPendingChanges] = useState(false);
 
   const API_BASE = 'http://10.0.2.2:8080/api/v1';
 
@@ -126,6 +128,8 @@ export default function AdminEmployeesScreen() {
     const directPerms = employee.directPermissions || [];
     const allPerms = [...new Set([...rolePerms, ...directPerms])];
     setUserPermissions(allPerms);
+    setPendingPermissions(directPerms);
+    setHasPendingChanges(false);
     
     setDetailModalOpen(true);
   }
@@ -185,7 +189,7 @@ export default function AdminEmployeesScreen() {
       return;
     }
     
-    // Toggle direct permission
+    // Toggle direct permission (chỉ thay đổi local, chưa gọi API)
     const directPerms = userPermissions.filter(p => !rolePermissions.includes(p));
     const newDirectPerms = directPerms.includes(permissionCode)
       ? directPerms.filter(p => p !== permissionCode)
@@ -193,18 +197,75 @@ export default function AdminEmployeesScreen() {
     
     const newPermissions = [...rolePermissions, ...newDirectPerms];
     setUserPermissions(newPermissions);
+    setPendingPermissions(newDirectPerms);
+    setHasPendingChanges(true);
+  }
+
+  async function savePermissions() {
+    if (!selectedEmployee) return;
     
-    // Send to API
-    fetch(`${API_BASE}/tenant-admin/users/${selectedEmployee?.id}/permissions`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${getAccessToken()}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ permissions: newDirectPerms }),
-    }).catch(() => {
-      Alert.alert(t.error, language === 'vi' ? 'Không thể cập nhật quyền' : 'Cannot update permissions');
-    });
+    Alert.alert(
+      language === 'vi' ? 'Xác nhận' : 'Confirm',
+      language === 'vi' 
+        ? 'Bạn có chắc muốn lưu thay đổi quyền?'
+        : 'Are you sure you want to save permission changes?',
+      [
+        { text: t.cancel, style: 'cancel' },
+        {
+          text: language === 'vi' ? 'Lưu' : 'Save',
+          onPress: async () => {
+            setProcessing(true);
+            try {
+              const token = await getAccessToken();
+              const res = await fetch(`${API_BASE}/tenant-admin/users/${selectedEmployee.id}/permissions`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ permissions: pendingPermissions }),
+              });
+              
+              if (res.ok) {
+                // Cập nhật lại danh sách employees
+                const rolePerms = selectedEmployee.roleId 
+                  ? (roles.find(r => r.id === selectedEmployee.roleId)?.permissions || [])
+                  : [];
+                const newAllPerms = [...rolePerms, ...pendingPermissions];
+                
+                setEmployees(prev => prev.map(e => 
+                  e.id === selectedEmployee.id 
+                    ? { ...e, permissions: newAllPerms, directPermissions: pendingPermissions }
+                    : e
+                ));
+                
+                // Cập nhật selectedEmployee
+                setSelectedEmployee(prev => prev ? { ...prev, permissions: newAllPerms, directPermissions: pendingPermissions } : null);
+                
+                // Cập nhật UI state
+                setUserPermissions(newAllPerms);
+                setHasPendingChanges(false);
+                setDetailModalOpen(false);
+                
+                Alert.alert(
+                  t.success,
+                  language === 'vi' ? 'Đã lưu thay đổi quyền' : 'Permission changes saved'
+                );
+              } else {
+                throw new Error('Failed to update');
+              }
+            } catch (e) {
+              Alert.alert(
+                t.error,
+                language === 'vi' ? 'Không thể lưu thay đổi quyền' : 'Cannot save permission changes'
+              );
+            } finally {
+              setProcessing(false);
+            }
+          },
+        },
+      ]
+    );
   }
 
   async function toggleStatus(employee: Employee) {
@@ -567,6 +628,26 @@ export default function AdminEmployeesScreen() {
                       );
                     })}
                   </View>
+                  
+                  {/* Save Permissions Button */}
+                  {hasPendingChanges && (
+                    <TouchableOpacity
+                      style={[styles.savePermissionsBtn]}
+                      onPress={savePermissions}
+                      disabled={processing}
+                    >
+                      {processing ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                          <Text style={styles.savePermissionsBtnText}>
+                            {language === 'vi' ? 'Lưu thay đổi quyền' : 'Save Permission Changes'}
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {/* Actions */}
@@ -778,4 +859,8 @@ const styles = StyleSheet.create({
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#10b981', paddingVertical: 14, borderRadius: 12, marginTop: 8 },
   saveBtnDisabled: { opacity: 0.6 },
   saveBtnText: { fontSize: 15, color: '#fff', fontWeight: '600' },
+  
+  // Save Permissions Button
+  savePermissionsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#10b981', paddingVertical: 14, borderRadius: 12, marginTop: 16 },
+  savePermissionsBtnText: { fontSize: 15, color: '#fff', fontWeight: '600' },
 });

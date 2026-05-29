@@ -3,16 +3,19 @@ import {
   View, Text, FlatList, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Modal, TextInput, Pressable, RefreshControl, ScrollView
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import * as documentPicker from 'expo-document-picker';
+import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { AppShell } from '../components/layout/AppShell';
 import { useLanguageStore, translations } from '../lib/language-store';
 import { getAccessToken } from '../lib/auth-store';
-import { KNOWLEDGE_BASE } from '../lib/api/config';
+import { KNOWLEDGE_BASE, CATEGORIES_BASE, TAGS_BASE, TENANT_ADMIN_BASE } from '../lib/api/config';
 
 const API_TIMEOUT = 15000;
+const DOWNLOAD_HISTORY_KEY = 'download_history';
 
 interface Document {
   id: string;
@@ -40,6 +43,25 @@ interface Category {
   id: string;
   name: string;
   code: string;
+}
+
+interface Tag {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface Department {
+  id: number;
+  name: string;
+  code: string;
+}
+
+interface Role {
+  id: number;
+  name: string;
+  code: string;
+  level: number;
 }
 
 const VISIBILITY_LABELS_VI: Record<string, string> = {
@@ -129,6 +151,9 @@ export default function DocumentsScreen() {
   
   const [documents, setDocuments] = useState<Document[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,25 +167,131 @@ export default function DocumentsScreen() {
   const [uploadFile, setUploadFile] = useState<{ uri: string; name: string; type: string; size: number } | null>(null);
   const [uploadVisibility, setUploadVisibility] = useState<string>('COMPANY_WIDE');
   const [uploadCategory, setUploadCategory] = useState<string>('');
+  const [uploadTags, setUploadTags] = useState<string[]>([]);
+  const [uploadDepartments, setUploadDepartments] = useState<number[]>([]);
+  const [uploadRoles, setUploadRoles] = useState<number[]>([]);
+  const [uploadMinRoleLevel, setUploadMinRoleLevel] = useState<number>(1);
   const [uploading, setUploading] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [downloadHistory, setDownloadHistory] = useState<{ id: string; filename: string; uri: string; downloadedAt: number }[]>([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  
+  // Picker modal states
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showRoleLevelPicker, setShowRoleLevelPicker] = useState(false);
+  const [showVisibilityPicker, setShowVisibilityPicker] = useState(false);
+  
+  // Load download history
+  async function loadDownloadHistory() {
+    try {
+      const data = await SecureStore.getItemAsync(DOWNLOAD_HISTORY_KEY);
+      if (data) {
+        setDownloadHistory(JSON.parse(data));
+      }
+    } catch (e) {
+      console.log('Load history error:', e);
+    }
+  }
+  
+  // Save to download history
+  async function saveToDownloadHistory(filename: string, uri: string) {
+    try {
+      const newEntry = {
+        id: Date.now().toString(),
+        filename,
+        uri,
+        downloadedAt: Date.now(),
+      };
+      const updated = [newEntry, ...downloadHistory].slice(0, 50);
+      setDownloadHistory(updated);
+      await SecureStore.setItemAsync(DOWNLOAD_HISTORY_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.log('Save history error:', e);
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
       loadData();
+      loadDownloadHistory();
     }, [])
   );
+  
+  // Reload data when upload modal opens
+  useFocusEffect(
+    useCallback(() => {
+      if (showUploadModal) {
+        // Reset form
+        setUploadTitle('');
+        setUploadDescription('');
+        setUploadFile(null);
+        setUploadCategory('');
+        setUploadTags([]);
+        setUploadDepartments([]);
+        setUploadRoles([]);
+        setUploadMinRoleLevel(1);
+        setUploadVisibility('COMPANY_WIDE');
+        // Reload categories, tags, departments, roles
+        loadMetadata();
+      }
+    }, [showUploadModal])
+  );
+  
+  // Load metadata for upload form
+  async function loadMetadata() {
+    try {
+      const [catsResult, tagsResult, deptsResult, rolesResult] = await Promise.allSettled([
+        apiRequest(`${KNOWLEDGE_BASE}/categories/manage`),
+        apiRequest(`${TAGS_BASE}/active`),
+        apiRequest(`${TENANT_ADMIN_BASE}/departments/active`),
+        apiRequest(`${TENANT_ADMIN_BASE}/roles`),
+      ]);
+      
+      if (catsResult.status === 'fulfilled' && catsResult.value.ok) {
+        const catsData = await catsResult.value.json();
+        if (Array.isArray(catsData)) setCategories(catsData);
+        else if (catsData?.content) setCategories(catsData.content);
+        else if (catsData?.data) setCategories(catsData.data);
+      }
+      
+      if (tagsResult.status === 'fulfilled' && tagsResult.value.ok) {
+        const tagsData = await tagsResult.value.json();
+        if (Array.isArray(tagsData)) setTags(tagsData);
+        else if (tagsData?.content) setTags(tagsData.content);
+        else if (tagsData?.data) setTags(tagsData.data);
+      }
+      
+      if (deptsResult.status === 'fulfilled' && deptsResult.value.ok) {
+        const deptsData = await deptsResult.value.json();
+        if (Array.isArray(deptsData)) setDepartments(deptsData);
+        else if (deptsData?.content) setDepartments(deptsData.content);
+        else if (deptsData?.data) setDepartments(deptsData.data);
+      }
+      
+      if (rolesResult.status === 'fulfilled' && rolesResult.value.ok) {
+        const rolesData = await rolesResult.value.json();
+        if (Array.isArray(rolesData)) setRoles(rolesData);
+        else if (rolesData?.content) setRoles(rolesData.content);
+        else if (rolesData?.data) setRoles(rolesData.data);
+      }
+    } catch (e) {
+      console.log('Load metadata error:', e);
+    }
+  }
 
   async function loadData() {
     try {
       setLoading(true);
       setError(null);
       
-      const [docsResult, catsResult] = await Promise.allSettled([
+      const [docsResult, catsResult, tagsResult, deptsResult, rolesResult] = await Promise.allSettled([
         apiRequest(`${KNOWLEDGE_BASE}/documents`),
-        apiRequest(`${KNOWLEDGE_BASE}/categories`),
+        apiRequest(`${KNOWLEDGE_BASE}/categories/manage`),
+        apiRequest(`${TAGS_BASE}/active`),
+        apiRequest(`${TENANT_ADMIN_BASE}/departments/active`),
+        apiRequest(`${TENANT_ADMIN_BASE}/roles`),
       ]);
       
       if (docsResult.status === 'fulfilled') {
@@ -191,10 +322,49 @@ export default function DocumentsScreen() {
       
       if (catsResult.status === 'fulfilled' && catsResult.value.ok) {
         const catsData = await catsResult.value.json();
+        console.log('Categories data:', JSON.stringify(catsData)?.substring(0, 500));
         if (Array.isArray(catsData)) {
           setCategories(catsData);
         } else if (catsData?.content) {
           setCategories(catsData.content);
+        } else if (catsData?.data) {
+          setCategories(catsData.data);
+        }
+      }
+      
+      if (tagsResult.status === 'fulfilled' && tagsResult.value.ok) {
+        const tagsData = await tagsResult.value.json();
+        console.log('Tags data:', JSON.stringify(tagsData)?.substring(0, 500));
+        if (Array.isArray(tagsData)) {
+          setTags(tagsData);
+        } else if (tagsData?.content) {
+          setTags(tagsData.content);
+        } else if (tagsData?.data) {
+          setTags(tagsData.data);
+        }
+      }
+      
+      if (deptsResult.status === 'fulfilled' && deptsResult.value.ok) {
+        const deptsData = await deptsResult.value.json();
+        console.log('Departments data:', JSON.stringify(deptsData)?.substring(0, 500));
+        if (Array.isArray(deptsData)) {
+          setDepartments(deptsData);
+        } else if (deptsData?.content) {
+          setDepartments(deptsData.content);
+        } else if (deptsData?.data) {
+          setDepartments(deptsData.data);
+        }
+      }
+      
+      if (rolesResult.status === 'fulfilled' && rolesResult.value.ok) {
+        const rolesData = await rolesResult.value.json();
+        console.log('Roles data:', JSON.stringify(rolesData)?.substring(0, 500));
+        if (Array.isArray(rolesData)) {
+          setRoles(rolesData);
+        } else if (rolesData?.content) {
+          setRoles(rolesData.content);
+        } else if (rolesData?.data) {
+          setRoles(rolesData.data);
         }
       }
       
@@ -240,6 +410,18 @@ export default function DocumentsScreen() {
       if (uploadCategory) {
         formData.append('categoryId', uploadCategory);
       }
+      if (uploadTags.length > 0) {
+        formData.append('tagIds', JSON.stringify(uploadTags));
+      }
+      if (uploadDepartments.length > 0) {
+        formData.append('accessibleDepartments', JSON.stringify(uploadDepartments));
+      }
+      if (uploadRoles.length > 0) {
+        formData.append('accessibleRoles', JSON.stringify(uploadRoles));
+      }
+      if (uploadMinRoleLevel > 1) {
+        formData.append('minimumRoleLevel', uploadMinRoleLevel.toString());
+      }
       
       const res = await apiRequest(`${KNOWLEDGE_BASE}/documents/upload`, {
         method: 'POST',
@@ -256,6 +438,11 @@ export default function DocumentsScreen() {
         setUploadDescription('');
         setUploadFile(null);
         setUploadCategory('');
+        setUploadTags([]);
+        setUploadDepartments([]);
+        setUploadRoles([]);
+        setUploadMinRoleLevel(1);
+        setUploadVisibility('COMPANY_WIDE');
         loadData();
       } else {
         const errorText = await res.text();
@@ -298,8 +485,41 @@ export default function DocumentsScreen() {
 
   async function handleDownload(doc: Document) {
     try {
-      const downloadUrl = `${KNOWLEDGE_BASE}/documents/${doc.id}/download`;
-      await WebBrowser.openBrowserAsync(downloadUrl);
+      const token = await getAccessToken();
+      const filename = doc.originalFileName || doc.documentTitle || 'document';
+      const fileUri = `${FileSystem.documentDirectory}${filename}`;
+      
+      // Tải file trực tiếp với auth header
+      const downloadResult = await FileSystem.downloadAsync(
+        `${KNOWLEDGE_BASE}/documents/${doc.id}/download`,
+        fileUri,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      
+      if (downloadResult.status === 200) {
+        // Lưu vào download history
+        await saveToDownloadHistory(filename, downloadResult.uri);
+        
+        // Share file để lưu vào Files app
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(downloadResult.uri, {
+            mimeType: getMimeType(filename),
+            dialogTitle: isVi ? 'Lưu file' : 'Save file',
+          });
+        } else {
+          Alert.alert(
+            isVi ? 'Thành công' : 'Success',
+            isVi ? `Đã tải "${filename}" thành công.` : `Downloaded "${filename}" successfully.`
+          );
+        }
+      } else {
+        Alert.alert(
+          isVi ? 'Lỗi' : 'Error',
+          isVi ? 'Không thể tải xuống tài liệu' : 'Cannot download document'
+        );
+      }
     } catch (e) {
       console.log('Download error:', e);
       Alert.alert(
@@ -307,6 +527,24 @@ export default function DocumentsScreen() {
         isVi ? 'Không thể tải xuống tài liệu' : 'Cannot download document'
       );
     }
+  }
+  
+  function getMimeType(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      'pdf': 'application/pdf',
+      'doc': 'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'xls': 'application/vnd.ms-excel',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'ppt': 'application/vnd.ms-powerpoint',
+      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'txt': 'text/plain',
+      'png': 'image/png',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+    };
+    return mimeTypes[ext || ''] || 'application/octet-stream';
   }
 
   async function handleViewDetail(doc: Document) {
@@ -486,12 +724,24 @@ export default function DocumentsScreen() {
         />
 
         {canUpload && (
-          <TouchableOpacity
-            style={styles.fab}
-            onPress={() => setShowUploadModal(true)}
-          >
-            <Ionicons name="add" size={28} color="#fff" />
-          </TouchableOpacity>
+          <>
+            {/* Nút xem lịch sử download */}
+            {downloadHistory.length > 0 && (
+              <TouchableOpacity
+                style={styles.historyFab}
+                onPress={() => setShowHistoryModal(true)}
+              >
+                <Ionicons name="folder" size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity
+              style={styles.fab}
+              onPress={() => setShowUploadModal(true)}
+            >
+              <Ionicons name="add" size={28} color="#fff" />
+            </TouchableOpacity>
+          </>
         )}
 
         <Modal
@@ -540,20 +790,10 @@ export default function DocumentsScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.select}
-                onPress={() => {
-                  const options = categories.map(c => ({ text: `${c.name} (${c.code})`, value: c.id }));
-                  Alert.alert(
-                    isVi ? 'Chọn danh mục' : 'Select category',
-                    '',
-                    [
-                      { text: isVi ? 'Không chọn' : 'None', onPress: () => setUploadCategory('') },
-                      ...options.map(o => ({ text: o.text, onPress: () => setUploadCategory(o.value) }))
-                    ]
-                  );
-                }}
+                onPress={() => setShowCategoryPicker(true)}
               >
                 <Text style={styles.selectText}>
-                  {uploadCategory 
+                  {uploadCategory
                     ? categories.find(c => c.id === uploadCategory)?.name || uploadCategory
                     : isVi ? 'Chọn danh mục' : 'Select category'
                   }
@@ -561,26 +801,128 @@ export default function DocumentsScreen() {
                 <Ionicons name="chevron-down" size={20} color="#6b7280" />
               </TouchableOpacity>
 
+              {/* Tags */}
+              <Text style={styles.label}>
+                {isVi ? 'Nhãn' : 'Tags'}
+              </Text>
+              <View style={styles.tagsContainer}>
+                {tags.map(tag => (
+                  <TouchableOpacity
+                    key={tag.id}
+                    style={[styles.tagChip, uploadTags.includes(tag.id) && styles.tagChipSelected]}
+                    onPress={() => {
+                      if (uploadTags.includes(tag.id)) {
+                        setUploadTags(uploadTags.filter(t => t !== tag.id));
+                      } else {
+                        setUploadTags([...uploadTags, tag.id]);
+                      }
+                    }}
+                  >
+                    <Text style={[styles.tagChipText, uploadTags.includes(tag.id) && styles.tagChipTextSelected]}>
+                      {tag.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                {tags.length === 0 && (
+                  <Text style={styles.noDataText}>
+                    {isVi ? 'Không có nhãn nào' : 'No tags available'}
+                  </Text>
+                )}
+              </View>
+
               <Text style={styles.label}>
                 {isVi ? 'Quyền truy cập' : 'Access'}
               </Text>
               <TouchableOpacity
                 style={styles.select}
-                onPress={() => {
-                  const options = [
-                    { text: VISIBILITY_LABELS_VI.COMPANY_WIDE, value: 'COMPANY_WIDE' },
-                    { text: VISIBILITY_LABELS_VI.SPECIFIC_DEPARTMENTS, value: 'SPECIFIC_DEPARTMENTS' },
-                    { text: VISIBILITY_LABELS_VI.SPECIFIC_ROLES, value: 'SPECIFIC_ROLES' },
-                  ];
-                  Alert.alert(
-                    isVi ? 'Chọn quyền truy cập' : 'Select access',
-                    '',
-                    options.map(o => ({ text: o.text, onPress: () => setUploadVisibility(o.value) }))
-                  );
-                }}
+                onPress={() => setShowVisibilityPicker(true)}
               >
                 <Text style={styles.selectText}>
                   {getVisibilityLabel(uploadVisibility)}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#6b7280" />
+              </TouchableOpacity>
+
+              {/* Departments - shown when visibility requires it */}
+              {(uploadVisibility === 'SPECIFIC_DEPARTMENTS' || uploadVisibility === 'SPECIFIC_DEPARTMENTS_AND_ROLES') && (
+                <>
+                  <Text style={styles.label}>
+                    {isVi ? 'Phòng ban được truy cập' : 'Accessible Departments'}
+                  </Text>
+                  <View style={styles.tagsContainer}>
+                    {departments.map(dept => (
+                      <TouchableOpacity
+                        key={dept.id}
+                        style={[styles.tagChip, uploadDepartments.includes(dept.id) && styles.tagChipSelected]}
+                        onPress={() => {
+                          if (uploadDepartments.includes(dept.id)) {
+                            setUploadDepartments(uploadDepartments.filter(d => d !== dept.id));
+                          } else {
+                            setUploadDepartments([...uploadDepartments, dept.id]);
+                          }
+                        }}
+                      >
+                        <Text style={[styles.tagChipText, uploadDepartments.includes(dept.id) && styles.tagChipTextSelected]}>
+                          {dept.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    {departments.length === 0 && (
+                      <Text style={styles.noDataText}>
+                        {isVi ? 'Không có phòng ban nào' : 'No departments available'}
+                      </Text>
+                    )}
+                  </View>
+                </>
+              )}
+
+              {/* Roles - shown when visibility requires it */}
+              {(uploadVisibility === 'SPECIFIC_ROLES' || uploadVisibility === 'SPECIFIC_DEPARTMENTS_AND_ROLES') && (
+                <>
+                  <Text style={styles.label}>
+                    {isVi ? 'Vai trò được truy cập' : 'Accessible Roles'}
+                  </Text>
+                  <View style={styles.tagsContainer}>
+                    {roles.map(role => (
+                      <TouchableOpacity
+                        key={role.id}
+                        style={[styles.tagChip, uploadRoles.includes(role.id) && styles.tagChipSelected]}
+                        onPress={() => {
+                          if (uploadRoles.includes(role.id)) {
+                            setUploadRoles(uploadRoles.filter(r => r !== role.id));
+                          } else {
+                            setUploadRoles([...uploadRoles, role.id]);
+                          }
+                        }}
+                      >
+                        <Text style={[styles.tagChipText, uploadRoles.includes(role.id) && styles.tagChipTextSelected]}>
+                          {role.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    {roles.length === 0 && (
+                      <Text style={styles.noDataText}>
+                        {isVi ? 'Không có vai trò nào' : 'No roles available'}
+                      </Text>
+                    )}
+                  </View>
+                </>
+              )}
+
+              {/* Minimum Role Level */}
+              <Text style={styles.label}>
+                {isVi ? 'Cấp độ vai trò tối thiểu' : 'Minimum Role Level'}
+              </Text>
+              <TouchableOpacity
+                style={styles.select}
+                onPress={() => setShowRoleLevelPicker(true)}
+              >
+                <Text style={styles.selectText}>
+                  {uploadMinRoleLevel === 1 ? (isVi ? '1 - Giám đốc' : '1 - Executive') :
+                   uploadMinRoleLevel === 2 ? (isVi ? '2 - Trưởng phòng' : '2 - Manager') :
+                   uploadMinRoleLevel === 3 ? (isVi ? '3 - Senior' : '3 - Senior') :
+                   uploadMinRoleLevel === 4 ? (isVi ? '4 - Nhân viên' : '4 - Employee') :
+                   (isVi ? '5 - Thực tập' : '5 - Intern')}
                 </Text>
                 <Ionicons name="chevron-down" size={20} color="#6b7280" />
               </TouchableOpacity>
@@ -735,6 +1077,226 @@ export default function DocumentsScreen() {
                 </>
               )}
             </ScrollView>
+          </View>
+        </Modal>
+
+        {/* Download History Modal */}
+        <Modal
+          visible={showHistoryModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowHistoryModal(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {isVi ? 'File đã tải' : 'Downloaded Files'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowHistoryModal(false)}>
+                <Ionicons name="close" size={24} color="#374151" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalContent}>
+              {downloadHistory.length === 0 ? (
+                <View style={styles.centerContainer}>
+                  <Ionicons name="folder-open-outline" size={64} color="#d1d5db" />
+                  <Text style={styles.loadingText}>
+                    {isVi ? 'Chưa có file nào được tải' : 'No files downloaded'}
+                  </Text>
+                </View>
+              ) : (
+                downloadHistory.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.historyModalItem}
+                    onPress={() => {
+                      // Set file vào upload form
+                      setUploadFile({
+                        uri: item.uri,
+                        name: item.filename,
+                        type: getMimeType(item.filename),
+                        size: 0,
+                      });
+                      setShowHistoryModal(false);
+                      setShowUploadModal(true);
+                    }}
+                  >
+                    <View style={styles.historyModalItemIcon}>
+                      <Ionicons name="document-text" size={20} color="#3b82f6" />
+                    </View>
+                    <View style={styles.historyModalItemInfo}>
+                      <Text style={styles.historyModalItemName} numberOfLines={1}>
+                        {item.filename}
+                      </Text>
+                      <Text style={styles.historyModalItemTime}>
+                        {new Date(item.downloadedAt).toLocaleString(isVi ? 'vi-VN' : 'en-US')}
+                      </Text>
+                    </View>
+                    <Ionicons name="arrow-forward" size={20} color="#9ca3af" />
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </Modal>
+
+        {/* Category Picker Modal */}
+        <Modal
+          visible={showCategoryPicker}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowCategoryPicker(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {isVi ? 'Chọn danh mục' : 'Select Category'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
+                <Ionicons name="close" size={24} color="#374151" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={categories}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerItem,
+                    uploadCategory === item.id && styles.pickerItemSelected
+                  ]}
+                  onPress={() => {
+                    setUploadCategory(item.id);
+                    setShowCategoryPicker(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.pickerItemText,
+                    uploadCategory === item.id && styles.pickerItemTextSelected
+                  ]}>
+                    {item.name}
+                  </Text>
+                  <Text style={styles.pickerItemSubtext}>{item.code}</Text>
+                  {uploadCategory === item.id && (
+                    <Ionicons name="checkmark-circle" size={24} color="#10b981" />
+                  )}
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              ListEmptyComponent={
+                <View style={styles.centerContainer}>
+                  <Text style={styles.loadingText}>
+                    {isVi ? 'Không có danh mục nào' : 'No categories available'}
+                  </Text>
+                </View>
+              }
+            />
+          </View>
+        </Modal>
+
+        {/* Role Level Picker Modal */}
+        <Modal
+          visible={showRoleLevelPicker}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowRoleLevelPicker(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {isVi ? 'Chọn cấp độ vai trò' : 'Select Role Level'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowRoleLevelPicker(false)}>
+                <Ionicons name="close" size={24} color="#374151" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={[
+                { value: 1, label: isVi ? '1 - Giám đốc' : '1 - Executive', desc: isVi ? 'CEO, Giám đốc' : 'CEO, Director' },
+                { value: 2, label: isVi ? '2 - Trưởng phòng' : '2 - Manager', desc: isVi ? 'Quản lý cấp cao' : 'Senior Manager' },
+                { value: 3, label: isVi ? '3 - Senior' : '3 - Senior', desc: isVi ? 'Team Lead, Senior' : 'Team Lead, Senior' },
+                { value: 4, label: isVi ? '4 - Nhân viên' : '4 - Employee', desc: isVi ? 'Nhân viên' : 'Employee' },
+                { value: 5, label: isVi ? '5 - Thực tập' : '5 - Intern', desc: isVi ? 'Thực tập sinh' : 'Intern' },
+              ]}
+              keyExtractor={(item) => item.value.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerItem,
+                    uploadMinRoleLevel === item.value && styles.pickerItemSelected
+                  ]}
+                  onPress={() => {
+                    setUploadMinRoleLevel(item.value);
+                    setShowRoleLevelPicker(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.pickerItemText,
+                    uploadMinRoleLevel === item.value && styles.pickerItemTextSelected
+                  ]}>
+                    {item.label}
+                  </Text>
+                  <Text style={styles.pickerItemSubtext}>{item.desc}</Text>
+                  {uploadMinRoleLevel === item.value && (
+                    <Ionicons name="checkmark-circle" size={24} color="#10b981" />
+                  )}
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+            />
+          </View>
+        </Modal>
+
+        {/* Visibility Picker Modal */}
+        <Modal
+          visible={showVisibilityPicker}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowVisibilityPicker(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {isVi ? 'Chọn quyền truy cập' : 'Select Access'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowVisibilityPicker(false)}>
+                <Ionicons name="close" size={24} color="#374151" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={[
+                { value: 'COMPANY_WIDE', label: VISIBILITY_LABELS_VI.COMPANY_WIDE, desc: isVi ? 'Tất cả nhân viên đều có thể xem' : 'All employees can view' },
+                { value: 'SPECIFIC_DEPARTMENTS', label: VISIBILITY_LABELS_VI.SPECIFIC_DEPARTMENTS, desc: isVi ? 'Chỉ phòng ban được chọn' : 'Only selected departments' },
+                { value: 'SPECIFIC_ROLES', label: VISIBILITY_LABELS_VI.SPECIFIC_ROLES, desc: isVi ? 'Chỉ vai trò được chọn' : 'Only selected roles' },
+                { value: 'SPECIFIC_DEPARTMENTS_AND_ROLES', label: VISIBILITY_LABELS_VI.SPECIFIC_DEPARTMENTS_AND_ROLES, desc: isVi ? 'Phòng ban VÀ vai trò' : 'Departments AND roles' },
+              ]}
+              keyExtractor={(item) => item.value}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerItem,
+                    uploadVisibility === item.value && styles.pickerItemSelected
+                  ]}
+                  onPress={() => {
+                    setUploadVisibility(item.value);
+                    setShowVisibilityPicker(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.pickerItemText,
+                    uploadVisibility === item.value && styles.pickerItemTextSelected
+                  ]}>
+                    {item.label}
+                  </Text>
+                  <Text style={styles.pickerItemSubtext}>{item.desc}</Text>
+                  {uploadVisibility === item.value && (
+                    <Ionicons name="checkmark-circle" size={24} color="#10b981" />
+                  )}
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+            />
           </View>
         </Modal>
       </View>
@@ -1037,5 +1599,116 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  // History modal styles
+  historyFab: {
+    position: 'absolute',
+    bottom: 90,
+    right: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#3b82f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  historyModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#f9fafb',
+    borderRadius: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  historyModalItemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#dbeafe',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  historyModalItemInfo: {
+    flex: 1,
+  },
+  historyModalItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  historyModalItemTime: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  // Tags styles
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  tagChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  tagChipSelected: {
+    backgroundColor: '#10b981',
+    borderColor: '#10b981',
+  },
+  tagChipText: {
+    fontSize: 13,
+    color: '#374151',
+  },
+  tagChipTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  noDataText: {
+    fontSize: 13,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  // Picker modal styles
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#fff',
+  },
+  pickerItemSelected: {
+    backgroundColor: '#f0fdf4',
+  },
+  pickerItemText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#111827',
+  },
+  pickerItemTextSelected: {
+    color: '#10b981',
+    fontWeight: '600',
+  },
+  pickerItemSubtext: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginRight: 12,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginLeft: 20,
   },
 });
