@@ -64,7 +64,7 @@ export default function ChangePasswordScreen() {
     setLoading(true);
     try {
       const res = await fetchWithAuth(`${API_BASE_URL}/api/v1/profile/change-password`, {
-        method: 'PUT',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           newPassword: newPassword,

@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator,
-  Alert, ScrollView, Modal, Animated
+  ScrollView, Modal, Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { getProfile, updateProfile, sendOtpForContactEmail, updateContactEmail } from '../lib/api/profile';
 import { AppShell } from '../components/layout/AppShell';
+import { useNotification } from '../lib/notification';
 
 export default function ProfileScreen() {
+  const { showToast, showSuccess, showError } = useNotification();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
@@ -54,7 +56,7 @@ export default function ProfileScreen() {
         }
       }
     } catch (e) {
-      Alert.alert('Lỗi', 'Không thể tải thông tin cá nhân');
+      showError('Không thể tải thông tin cá nhân', 'Lỗi');
     } finally {
       setLoading(false);
     }
@@ -154,18 +156,18 @@ export default function ProfileScreen() {
 
   async function handleUpdateProfile() {
     if (phoneNumber && !validatePhoneNumber(phoneNumber)) {
-      Alert.alert('Lỗi', 'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam (10-11 số, bắt đầu bằng 0)');
+      showError('Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam (10-11 số, bắt đầu bằng 0)', 'Lỗi');
       return;
     }
 
     try {
       setUpdatingProfile(true);
       await updateProfile(phoneNumber, address, dateOfBirth);
-      Alert.alert('Thành công', 'Cập nhật thông tin thành công');
+      showSuccess('Cập nhật thông tin thành công', 'Thành công');
       setEditingProfile(false);
       await loadProfile();
     } catch (e: any) {
-      Alert.alert('Lỗi', e.message || 'Không thể cập nhật thông tin');
+      showError(e.message || 'Không thể cập nhật thông tin', 'Lỗi');
     } finally {
       setUpdatingProfile(false);
     }
@@ -173,16 +175,16 @@ export default function ProfileScreen() {
 
   async function handleSendOtp() {
     if (!newContactEmail.trim() || !newContactEmail.includes('@')) {
-      Alert.alert('Lỗi', 'Vui lòng nhập email hợp lệ');
+      showError('Vui lòng nhập email hợp lệ', 'Lỗi');
       return;
     }
     try {
       setSendingOtp(true);
       await sendOtpForContactEmail(newContactEmail);
       setOtpSent(true);
-      Alert.alert('Thành công', 'Mã OTP đã được gửi đến email của bạn');
+      showSuccess('Mã OTP đã được gửi đến email của bạn', 'Thành công');
     } catch (e: any) {
-      Alert.alert('Lỗi', e.message || 'Không thể gửi OTP');
+      showError(e.message || 'Không thể gửi OTP', 'Lỗi');
     } finally {
       setSendingOtp(false);
     }
@@ -190,20 +192,20 @@ export default function ProfileScreen() {
 
   async function handleUpdateContactEmail() {
     if (!otp.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập mã OTP');
+      showError('Vui lòng nhập mã OTP', 'Lỗi');
       return;
     }
     try {
       setUpdatingEmail(true);
       await updateContactEmail(newContactEmail, otp);
-      Alert.alert('Thành công', 'Cập nhật email liên hệ thành công');
+      showSuccess('Cập nhật email liên hệ thành công', 'Thành công');
       setShowEmailModal(false);
       setNewContactEmail('');
       setOtp('');
       setOtpSent(false);
       await loadProfile();
     } catch (e: any) {
-      Alert.alert('Lỗi', e.message || 'Không thể cập nhật email');
+      showError(e.message || 'Không thể cập nhật email', 'Lỗi');
     } finally {
       setUpdatingEmail(false);
     }

@@ -1,11 +1,18 @@
 import { CHATBOT_BASE } from './config';
 import { fetchJsonWithAuth } from './fetchWithAuth';
 
-export async function sendMessage(message: string, conversationId?: string) {
+export interface SendMessageOptions {
+  message: string;
+  conversationId?: string;
+  tagIds?: string[];
+}
+
+export async function sendMessage(options: SendMessageOptions) {
+  const { message, conversationId, tagIds } = options;
   return await fetchJsonWithAuth(`${CHATBOT_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, conversationId }),
+    body: JSON.stringify({ message, conversationId, tagIds }),
   });
 }
 

@@ -99,6 +99,7 @@ export function AppShell({ title, subtitle, children, headerRight }: AppShellPro
               </View>
             </View>
             <View style={styles.headerActions}>
+              {headerRight && <View style={{ marginRight: 8 }}>{headerRight}</View>}
               <HeaderDropdown />
             </View>
           </View>

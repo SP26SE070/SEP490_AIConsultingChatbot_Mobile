@@ -1,13 +1,14 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, RefreshControl, Modal, ScrollView, Switch, TextInput
+  StyleSheet, ActivityIndicator, RefreshControl, Modal, ScrollView, Switch, TextInput
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { AppShell } from '../../components/layout/AppShell';
 import { useLanguageStore, translations } from '../../lib/language-store';
 import { getAccessToken } from '../../lib/auth-store';
+import { useNotification } from '../../lib/notification';
 
 interface Employee {
   id: string;
@@ -51,6 +52,7 @@ const DEFAULT_PERMISSIONS = [
 export default function AdminEmployeesScreen() {
   const { language } = useLanguageStore();
   const t = translations[language];
+  const { showToast, showConfirm, showSuccess, showError } = useNotification();
   
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -66,13 +68,14 @@ export default function AdminEmployeesScreen() {
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
 
   const API_BASE = 'http://10.0.2.2:8080/api/v1';
 
   async function fetchEmployees() {
     try {
       const token = await getAccessToken();
-      const res = await fetch(`${API_BASE}/tenant-admin/users`, {
+      const res = await fetch(`${API_BASE}/tenant-admin/users?status=${statusFilter}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch');
@@ -109,9 +112,14 @@ export default function AdminEmployeesScreen() {
     }, [])
   );
 
-  function openDetail(employee: Employee) {
+  async function openDetail(employee: Employee) {
     setSelectedEmployee(employee);
     setSelectedRoleId(employee.roleId || null);
+    
+    // Ensure roles are loaded first
+    if (roles.length === 0) {
+      await fetchRoles();
+    }
     
     // Get role permissions
     if (employee.roleId) {
@@ -160,10 +168,10 @@ export default function AdminEmployeesScreen() {
       });
       
       setEditModalOpen(false);
-      Alert.alert(t.success, language === 'vi' ? 'Cập nhật thành công' : 'Update successful');
+      showSuccess(language === 'vi' ? 'Cập nhật thành công' : 'Update successful', t.success);
       fetchEmployees();
     } catch (e) {
-      Alert.alert(t.error, language === 'vi' ? 'Không thể cập nhật' : 'Cannot update');
+      showError(language === 'vi' ? 'Không thể cập nhật' : 'Cannot update', t.error);
     } finally {
       setProcessing(false);
     }
@@ -180,11 +188,11 @@ export default function AdminEmployeesScreen() {
   function togglePermission(permissionCode: string) {
     // Don't allow toggling role permissions
     if (isRolePermission(permissionCode)) {
-      Alert.alert(
-        language === 'vi' ? 'Không thể thay đổi' : 'Cannot change',
-        language === 'vi' 
+      showError(
+        language === 'vi'
           ? 'Quyền này được quy định bởi vai trò và không thể thay đổi'
-          : 'This permission is defined by the role and cannot be changed'
+          : 'This permission is defined by the role and cannot be changed',
+        language === 'vi' ? 'Không thể thay đổi' : 'Cannot change'
       );
       return;
     }
@@ -203,69 +211,51 @@ export default function AdminEmployeesScreen() {
 
   async function savePermissions() {
     if (!selectedEmployee) return;
-    
-    Alert.alert(
-      language === 'vi' ? 'Xác nhận' : 'Confirm',
-      language === 'vi' 
-        ? 'Bạn có chắc muốn lưu thay đổi quyền?'
-        : 'Are you sure you want to save permission changes?',
-      [
-        { text: t.cancel, style: 'cancel' },
-        {
-          text: language === 'vi' ? 'Lưu' : 'Save',
-          onPress: async () => {
-            setProcessing(true);
-            try {
-              const token = await getAccessToken();
-              const res = await fetch(`${API_BASE}/tenant-admin/users/${selectedEmployee.id}/permissions`, {
-                method: 'PUT',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ permissions: pendingPermissions }),
-              });
-              
-              if (res.ok) {
-                // Cập nhật lại danh sách employees
-                const rolePerms = selectedEmployee.roleId 
-                  ? (roles.find(r => r.id === selectedEmployee.roleId)?.permissions || [])
-                  : [];
-                const newAllPerms = [...rolePerms, ...pendingPermissions];
-                
-                setEmployees(prev => prev.map(e => 
-                  e.id === selectedEmployee.id 
-                    ? { ...e, permissions: newAllPerms, directPermissions: pendingPermissions }
-                    : e
-                ));
-                
-                // Cập nhật selectedEmployee
-                setSelectedEmployee(prev => prev ? { ...prev, permissions: newAllPerms, directPermissions: pendingPermissions } : null);
-                
-                // Cập nhật UI state
-                setUserPermissions(newAllPerms);
-                setHasPendingChanges(false);
-                setDetailModalOpen(false);
-                
-                Alert.alert(
-                  t.success,
-                  language === 'vi' ? 'Đã lưu thay đổi quyền' : 'Permission changes saved'
-                );
-              } else {
-                throw new Error('Failed to update');
-              }
-            } catch (e) {
-              Alert.alert(
-                t.error,
-                language === 'vi' ? 'Không thể lưu thay đổi quyền' : 'Cannot save permission changes'
-              );
-            } finally {
-              setProcessing(false);
-            }
-          },
+
+    const confirmed = await showConfirm({
+      title: language === 'vi' ? 'Xác nhận' : 'Confirm',
+      message: language === 'vi' ? 'Bạn có chắc muốn lưu thay đổi quyền?' : 'Are you sure you want to save permission changes?',
+      confirmText: language === 'vi' ? 'Lưu' : 'Save',
+      cancelText: t.cancel,
+    });
+    if (!confirmed) return;
+
+    setProcessing(true);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${API_BASE}/tenant-admin/users/${selectedEmployee.id}/permissions`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-      ]
-    );
+        body: JSON.stringify({ permissions: pendingPermissions }),
+      });
+
+      if (res.ok) {
+        const rolePerms = selectedEmployee.roleId
+          ? (roles.find(r => r.id === selectedEmployee.roleId)?.permissions || [])
+          : [];
+        const newAllPerms = [...rolePerms, ...pendingPermissions];
+
+        setEmployees(prev => prev.map(e =>
+          e.id === selectedEmployee.id
+            ? { ...e, permissions: newAllPerms, directPermissions: pendingPermissions }
+            : e
+        ));
+        setSelectedEmployee(prev => prev ? { ...prev, permissions: newAllPerms, directPermissions: pendingPermissions } : null);
+        setUserPermissions(newAllPerms);
+        setHasPendingChanges(false);
+        setDetailModalOpen(false);
+        showSuccess(language === 'vi' ? 'Đã lưu thay đổi quyền' : 'Permission changes saved', t.success);
+      } else {
+        throw new Error('Failed to update');
+      }
+    } catch (e) {
+      showError(language === 'vi' ? 'Không thể lưu thay đổi quyền' : 'Cannot save permission changes', t.error);
+    } finally {
+      setProcessing(false);
+    }
   }
 
   async function toggleStatus(employee: Employee) {
@@ -274,57 +264,52 @@ export default function AdminEmployeesScreen() {
       ? (language === 'vi' ? 'Bạn có chắc muốn ngừng kích hoạt nhân viên này?' : 'Are you sure you want to deactivate this employee?')
       : (language === 'vi' ? 'Bạn có chắc muốn kích hoạt nhân viên này?' : 'Are you sure you want to activate this employee?');
 
-    Alert.alert(
-      language === 'vi' ? 'Xác nhận' : 'Confirm',
-      confirmMsg,
-      [
-        { text: t.cancel, style: 'cancel' },
-        {
-          text: language === 'vi' ? 'Xác nhận' : 'Confirm',
-          onPress: async () => {
-            setProcessing(true);
-            try {
-              const token = await getAccessToken();
-              await fetch(`${API_BASE}/tenant-admin/users/${employee.id}/${action}`, {
-                method: 'PUT',
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              fetchEmployees();
-              if (detailModalOpen) setDetailModalOpen(false);
-            } catch (e) {
-              Alert.alert(t.error, language === 'vi' ? 'Đã xảy ra lỗi' : 'An error occurred');
-            } finally {
-              setProcessing(false);
-            }
-          },
-        },
-      ]
-    );
+    const confirmed = await showConfirm({
+      title: language === 'vi' ? 'Xác nhận' : 'Confirm',
+      message: confirmMsg,
+      confirmText: language === 'vi' ? 'Xác nhận' : 'Confirm',
+      cancelText: t.cancel,
+      confirmStyle: 'danger',
+    });
+    if (!confirmed) return;
+
+    setProcessing(true);
+    try {
+      const token = await getAccessToken();
+      await fetch(`${API_BASE}/tenant-admin/users/${employee.id}/${action}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchEmployees();
+      if (detailModalOpen) setDetailModalOpen(false);
+    } catch (e) {
+      showError(language === 'vi' ? 'Đã xảy ra lỗi' : 'An error occurred', t.error);
+    } finally {
+      setProcessing(false);
+    }
   }
 
   async function resetPassword(employee: Employee) {
-    Alert.alert(
-      language === 'vi' ? 'Đặt lại mật khẩu' : 'Reset Password',
-      language === 'vi' ? 'Email đặt lại mật khẩu sẽ được gửi đến nhân viên này?' : 'A password reset email will be sent to this employee?',
-      [
-        { text: t.cancel, style: 'cancel' },
-        {
-          text: language === 'vi' ? 'Gửi email' : 'Send Email',
-          onPress: async () => {
-            try {
-              const token = await getAccessToken();
-              await fetch(`${API_BASE}/tenant-admin/users/${employee.id}/reset-password`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              Alert.alert(t.success, language === 'vi' ? 'Đã gửi email đặt lại mật khẩu' : 'Password reset email sent');
-            } catch (e) {
-              Alert.alert(t.error, language === 'vi' ? 'Không thể gửi email' : 'Cannot send email');
-            }
-          },
-        },
-      ]
-    );
+    const confirmed = await showConfirm({
+      title: language === 'vi' ? 'Đặt lại mật khẩu' : 'Reset Password',
+      message: language === 'vi' ? 'Email đặt lại mật khẩu sẽ được gửi đến nhân viên này?' : 'A password reset email will be sent to this employee?',
+      confirmText: language === 'vi' ? 'Gửi email' : 'Send Email',
+      cancelText: t.cancel,
+      icon: 'key',
+      iconColor: '#f59e0b',
+    });
+    if (!confirmed) return;
+
+    try {
+      const token = await getAccessToken();
+      await fetch(`${API_BASE}/tenant-admin/users/${employee.id}/reset-password`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showSuccess(language === 'vi' ? 'Đã gửi email đặt lại mật khẩu' : 'Password reset email sent', t.success);
+    } catch (e) {
+      showError(language === 'vi' ? 'Không thể gửi email' : 'Cannot send email', t.error);
+    }
   }
 
   function onRefresh() {
@@ -392,6 +377,32 @@ export default function AdminEmployeesScreen() {
           <Text style={styles.summaryValue}>{employees.length}</Text>
           <Text style={styles.summaryLabel}>{language === 'vi' ? 'Tổng cộng' : 'Total'}</Text>
         </View>
+      </View>
+
+      {/* Status Filter */}
+      <View style={styles.filterRow}>
+        {(['ACTIVE', 'INACTIVE', 'ALL'] as const).map(status => (
+          <TouchableOpacity
+            key={status}
+            style={[
+              styles.filterBtn,
+              statusFilter === status && styles.filterBtnActive
+            ]}
+            onPress={() => {
+              setStatusFilter(status);
+              fetchEmployees();
+            }}
+          >
+            <Text style={[
+              styles.filterBtnText,
+              statusFilter === status && styles.filterBtnTextActive
+            ]}>
+              {status === 'ACTIVE' ? (language === 'vi' ? 'Hoạt động' : 'Active') :
+               status === 'INACTIVE' ? (language === 'vi' ? 'Tạm ngưng' : 'Inactive') :
+               (language === 'vi' ? 'Tất cả' : 'All')}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Employee List */}
@@ -771,6 +782,12 @@ const styles = StyleSheet.create({
   summaryIconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   summaryValue: { fontSize: 22, fontWeight: '700', color: '#f1f5f9' },
   summaryLabel: { fontSize: 11, color: '#94a3b8', marginTop: 2 },
+  
+  filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 12 },
+  filterBtn: { flex: 1, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20, backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155', alignItems: 'center' },
+  filterBtnActive: { backgroundColor: '#10b981', borderColor: '#10b981' },
+  filterBtnText: { fontSize: 12, color: '#94a3b8', fontWeight: '500' },
+  filterBtnTextActive: { color: '#fff', fontWeight: '600' },
   
   list: { paddingHorizontal: 16, paddingBottom: 20, gap: 12 },
   

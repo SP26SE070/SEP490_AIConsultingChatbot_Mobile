@@ -128,7 +128,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
     return (
       <View style={styles.sidebar}>
         <View style={styles.loading}>
-          <Ionicons name="loader-outline" size={24} color="#64748b" />
+          <Ionicons name="sync-outline" size={24} color="#64748b" />
         </View>
       </View>
     );

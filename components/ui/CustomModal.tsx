@@ -297,6 +297,123 @@ export function ErrorModal({ visible, title, message, buttonText, onClose }: Err
   );
 }
 
+// Info Modal
+interface InfoModalProps {
+  visible: boolean;
+  title?: string;
+  message: string;
+  buttonText?: string;
+  icon?: string;
+  iconColor?: string;
+  onClose: () => void;
+}
+
+export function InfoModal({ visible, title, message, buttonText, icon = 'information-circle', iconColor = '#3b82f6', onClose }: InfoModalProps) {
+  const { language } = useLanguageStore();
+  const isVi = language === 'vi';
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.overlay}>
+          <TouchableWithoutFeedback>
+            <View style={styles.infoModalContent}>
+              <View style={[styles.infoIconWrap, { backgroundColor: `${iconColor}20` }]}>
+                <Ionicons name={icon as any} size={48} color={iconColor} />
+              </View>
+              {title && <Text style={styles.infoTitle}>{title}</Text>}
+              <Text style={styles.infoMessage}>{message}</Text>
+              <TouchableOpacity style={[styles.infoBtn, { backgroundColor: iconColor }]} onPress={onClose} activeOpacity={0.7}>
+                <Text style={styles.infoBtnText}>{buttonText || (isVi ? 'Đóng' : 'Close')}</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
+}
+
+// Toast Modal (auto-dismiss)
+interface ToastModalProps {
+  visible: boolean;
+  message: string;
+  type?: 'success' | 'error' | 'info' | 'warning';
+  icon?: string;
+  duration?: number;
+}
+
+export function ToastModal({ visible, message, type = 'info', icon, duration = 2500 }: ToastModalProps) {
+  const config = {
+    success: { icon: icon || 'checkmark-circle', color: '#10b981', bg: '#10b981' },
+    error: { icon: icon || 'alert-circle', color: '#f87171', bg: '#f87171' },
+    info: { icon: icon || 'information-circle', color: '#3b82f6', bg: '#3b82f6' },
+    warning: { icon: icon || 'warning', color: '#f59e0b', bg: '#f59e0b' },
+  }[type];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+      <View style={toastStyles.overlay}>
+        <View style={toastStyles.container}>
+          <View style={[toastStyles.iconWrap, { backgroundColor: config.color + '20' }]}>
+            <Ionicons name={config.icon as any} size={22} color={config.color} />
+          </View>
+          <Text style={toastStyles.message} numberOfLines={3}>{message}</Text>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const toastStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 24,
+  },
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    maxWidth: '100%',
+    width: 'auto',
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    gap: 12,
+  },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  message: {
+    flex: 1,
+    fontSize: 14,
+    color: '#f1f5f9',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+});
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -508,6 +625,49 @@ const styles = StyleSheet.create({
   },
   errorBtnText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+
+  // Info Modal
+  infoModalContent: {
+    backgroundColor: '#1e293b',
+    borderRadius: 20,
+    padding: 28,
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
+  },
+  infoIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#f1f5f9',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  infoMessage: {
+    fontSize: 14,
+    color: '#94a3b8',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  infoBtn: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  infoBtnText: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#fff',
   },

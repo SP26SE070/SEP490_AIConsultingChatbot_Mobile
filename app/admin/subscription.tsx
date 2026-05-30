@@ -1,13 +1,14 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity,
-  StyleSheet, ActivityIndicator, RefreshControl, ScrollView, Alert, Image
+  StyleSheet, ActivityIndicator, RefreshControl, ScrollView, Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { AppShell } from '../../components/layout/AppShell';
 import { useLanguageStore, translations } from '../../lib/language-store';
 import { getAccessToken } from '../../lib/auth-store';
+import { useNotification } from '../../lib/notification';
 
 interface Subscription {
   subscription_id?: string;
@@ -129,6 +130,7 @@ const TIER_NAMES_EN: Record<string, string> = {
 export default function AdminSubscriptionScreen() {
   const { language } = useLanguageStore();
   const t = translations[language];
+  const { showToast, showSuccess, showError, showInfo } = useNotification();
 
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
@@ -258,36 +260,20 @@ export default function AdminSubscriptionScreen() {
       
       if (res.ok) {
         if (data.payment_id) {
-          // Paid plan - redirect to payment tab
           setPaymentInfo(data as PaymentInfo);
           setSelectedTab('payment');
-          Alert.alert(
-            language === 'vi' ? 'Thông tin thanh toán' : 'Payment Information',
-            language === 'vi' ? 'Vui lòng hoàn tất thanh toán.' : 'Please complete your payment.'
-          );
+          showInfo(language === 'vi' ? 'Vui lòng hoàn tất thanh toán.' : 'Please complete your payment.', language === 'vi' ? 'Thông tin thanh toán' : 'Payment Information');
         } else {
-          // Trial plan - success
-          Alert.alert(
-            language === 'vi' ? 'Thành công' : 'Success',
-            language === 'vi' ? 'Đã kích hoạt gói dùng thử!' : 'Trial plan activated!',
-            [{ text: 'OK', onPress: () => {
-              fetchSubscription();
-              setSelectedTab('current');
-            }}]
-          );
+          showSuccess(language === 'vi' ? 'Đã kích hoạt gói dùng thử!' : 'Trial plan activated!', language === 'vi' ? 'Thành công' : 'Success');
+          fetchSubscription();
+          setSelectedTab('current');
         }
       } else {
-        Alert.alert(
-          language === 'vi' ? 'Lỗi' : 'Error',
-          data?.error || data?.message || (language === 'vi' ? 'Không thể chọn gói.' : 'Cannot select plan.')
-        );
+        showError(data?.error || data?.message || (language === 'vi' ? 'Không thể chọn gói.' : 'Cannot select plan.'), language === 'vi' ? 'Lỗi' : 'Error');
         setSelectedPlanId(null);
       }
     } catch (e) {
-      Alert.alert(
-        language === 'vi' ? 'Lỗi' : 'Error',
-        language === 'vi' ? 'Không thể kết nối máy chủ.' : 'Cannot connect to server.'
-      );
+      showError(language === 'vi' ? 'Không thể kết nối máy chủ.' : 'Cannot connect to server.', language === 'vi' ? 'Lỗi' : 'Error');
       setSelectedPlanId(null);
     } finally {
       setProcessing(false);
@@ -295,52 +281,41 @@ export default function AdminSubscriptionScreen() {
   }
 
   async function handleCancelSubscription() {
-    Alert.prompt(
-      language === 'vi' ? 'Lý do hủy' : 'Cancellation Reason',
-      language === 'vi' ? 'Vui lòng nhập lý do hủy gói:' : 'Please enter reason for cancellation:',
-      [
-        { text: language === 'vi' ? 'Không' : 'Cancel', style: 'cancel' },
-        { 
-          text: language === 'vi' ? 'Huỷ gói' : 'Confirm', 
-          onPress: async (reason) => {
-            setProcessing(true);
-            try {
-              const token = await getAccessToken();
-              const res = await fetch(`${API_BASE}/subscriptions/cancel`, {
-                method: 'PUT',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ reason: reason || 'User requested cancellation' }),
-              });
-              const data = await res.json().catch(() => ({}));
-              
-              if (res.ok) {
-                Alert.alert(
-                  language === 'vi' ? 'Thành công' : 'Success',
-                  language === 'vi' ? 'Đã huỷ gói thành công!' : 'Subscription cancelled successfully!',
-                );
-                fetchSubscription();
-              } else {
-                Alert.alert(
-                  language === 'vi' ? 'Lỗi' : 'Error',
-                  data?.error || (language === 'vi' ? 'Không thể huỷ gói.' : 'Cannot cancel subscription.')
-                );
-              }
-            } catch (e) {
-              Alert.alert(
-                language === 'vi' ? 'Lỗi' : 'Error',
-                language === 'vi' ? 'Không thể kết nối máy chủ.' : 'Cannot connect to server.'
-              );
-            } finally {
-              setProcessing(false);
-            }
-          }
+    const confirmed = await showConfirm({
+      title: language === 'vi' ? 'Hủy gói' : 'Cancel Subscription',
+      message: language === 'vi' ? 'Bạn có chắc muốn hủy gói này?' : 'Are you sure you want to cancel this subscription?',
+      confirmText: language === 'vi' ? 'Hủy gói' : 'Cancel',
+      cancelText: language === 'vi' ? 'Không' : 'No',
+      confirmStyle: 'danger',
+      icon: 'close-circle',
+      iconColor: '#ef4444',
+    });
+    if (!confirmed) return;
+
+    setProcessing(true);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${API_BASE}/subscriptions/cancel`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-      ],
-      'plain-text'
-    );
+        body: JSON.stringify({ reason: 'User requested cancellation' }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        showSuccess(language === 'vi' ? 'Đã huỷ gói thành công!' : 'Subscription cancelled successfully!', language === 'vi' ? 'Thành công' : 'Success');
+        fetchSubscription();
+      } else {
+        showError(data?.error || (language === 'vi' ? 'Không thể huỷ gói.' : 'Cannot cancel subscription.'), language === 'vi' ? 'Lỗi' : 'Error');
+      }
+    } catch (e) {
+      showError(language === 'vi' ? 'Không thể kết nối máy chủ.' : 'Cannot connect to server.', language === 'vi' ? 'Lỗi' : 'Error');
+    } finally {
+      setProcessing(false);
+    }
   }
 
   async function handleToggleAutoRenew() {
@@ -357,24 +332,18 @@ export default function AdminSubscriptionScreen() {
       const data = await res.json().catch(() => ({}));
       
       if (res.ok) {
-        Alert.alert(
-          language === 'vi' ? 'Thành công' : 'Success',
-          nextValue 
+        showSuccess(
+          nextValue
             ? (language === 'vi' ? 'Đã bật tự động gia hạn' : 'Auto-renew enabled')
-            : (language === 'vi' ? 'Đã tắt tự động gia hạn' : 'Auto-renew disabled')
+            : (language === 'vi' ? 'Đã tắt tự động gia hạn' : 'Auto-renew disabled'),
+          language === 'vi' ? 'Thành công' : 'Success'
         );
         fetchSubscription();
       } else {
-        Alert.alert(
-          language === 'vi' ? 'Lỗi' : 'Error',
-          data?.error || (language === 'vi' ? 'Không thể cập nhật.' : 'Cannot update.')
-        );
+        showError(data?.error || (language === 'vi' ? 'Không thể cập nhật.' : 'Cannot update.'), language === 'vi' ? 'Lỗi' : 'Error');
       }
     } catch (e) {
-      Alert.alert(
-        language === 'vi' ? 'Lỗi' : 'Error',
-        language === 'vi' ? 'Không thể kết nối máy chủ.' : 'Cannot connect to server.'
-      );
+      showError(language === 'vi' ? 'Không thể kết nối máy chủ.' : 'Cannot connect to server.', language === 'vi' ? 'Lỗi' : 'Error');
     } finally {
       setProcessing(false);
     }

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,21 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Modal,
+  ScrollView,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useNavigation } from 'expo-router';
 import { sendMessage, getConversationHistory, rateMessage } from '../lib/api/chatbot';
 import { getPendingConversation, consumeNewChatRequest } from '../lib/navigation-store';
+import { useNotification } from '../lib/notification';
+import { saveChatSession, loadChatSession, clearChatSession } from '../lib/chat-session-store';
 import { COLORS } from '../lib/theme';
 import { AppShell } from '../components/layout/AppShell';
 import { useLanguageStore, translations } from '../lib/language-store';
+import { TAGS_BASE } from '../lib/api/config';
+import { getAccessToken } from '../lib/auth-store';
 
 interface Message {
   id: string;
@@ -39,6 +46,9 @@ interface ChatSourceDocument {
 export default function ChatbotScreen() {
   const { language } = useLanguageStore();
   const t = translations[language];
+  const isVi = language === 'vi';
+  const navigation = useNavigation();
+  const { showConfirm } = useNotification();
   
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -47,26 +57,88 @@ export default function ChatbotScreen() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  // Tag filter state
+  const [tags, setTags] = useState<{ id: string; name: string }[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [showTagPicker, setShowTagPicker] = useState(false);
+  const [loadingTags, setLoadingTags] = useState(false);
+
   const QUICK_PROMPTS = [
     language === 'vi' ? 'Chính sách nghỉ phép' : 'Leave policy',
     language === 'vi' ? 'Quy trình onboard' : 'Onboarding process',
     language === 'vi' ? 'Hỗ trợ IT' : 'IT Support',
   ];
 
+  // Load tags on mount
+  useEffect(() => {
+    loadTags();
+  }, []);
+
+  async function loadTags() {
+    setLoadingTags(true);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${TAGS_BASE}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const activeTags = (data.content || data || []).filter((tag: any) => tag.isActive !== false);
+        setTags(activeTags);
+      }
+    } catch (e) {
+      console.warn('Failed to load tags:', e);
+    } finally {
+      setLoadingTags(false);
+    }
+  }
+
+  function toggleTag(tagId: string) {
+    setSelectedTagIds(prev =>
+      prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
+    );
+  }
+
+  function clearTags() {
+    setSelectedTagIds([]);
+  }
+
+  // Load saved session on mount
+  useEffect(() => {
+    const loadSavedSession = async () => {
+      const savedSession = await loadChatSession();
+      if (savedSession && savedSession.messages.length > 0) {
+        setMessages(savedSession.messages);
+        setConversationId(savedSession.conversationId);
+      }
+    };
+    loadSavedSession();
+  }, []);
+
+  // Save session when messages change (debounced)
+  useEffect(() => {
+    if (messages.length > 0 && !historyLoading) {
+      saveChatSession({ conversationId, messages, lastUpdated: Date.now() });
+    }
+  }, [messages, conversationId, historyLoading]);
+
   useFocusEffect(
     useCallback(() => {
       if (consumeNewChatRequest()) {
+        // Start new conversation - clear session
         setConversationId(undefined);
         setMessages([]);
         return;
       }
       const convId = getPendingConversation();
-      if (convId) {
+      if (convId && convId !== conversationId) {
         setConversationId(convId);
         setMessages([]);
         loadConversationHistory(convId);
       }
-    }, [])
+      // If no pending conversation, restore saved session
+      // (This is handled in the useEffect above)
+    }, [conversationId])
   );
 
   async function loadConversationHistory(convId: string) {
@@ -80,6 +152,9 @@ export default function ChatbotScreen() {
           content: msg.content,
         }));
         setMessages(loadedMessages);
+        setConversationId(convId);
+        // Save loaded session
+        await saveChatSession({ conversationId: convId, messages: loadedMessages, lastUpdated: Date.now() });
       }
     } catch (e: any) {
       console.warn('Failed to load conversation history:', e);
@@ -120,7 +195,7 @@ export default function ChatbotScreen() {
     }
 
     try {
-      const result = await sendMessage(content, conversationId);
+      const result = await sendMessage({ message: content, conversationId, tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined });
       if (result.conversationId && !conversationId) {
         setConversationId(result.conversationId);
       }
@@ -150,6 +225,24 @@ export default function ChatbotScreen() {
     }
   }
 
+  async function startNewChat() {
+    const confirmed = await showConfirm({
+      title: language === 'vi' ? 'Cuộc trò chuyện mới?' : 'Start New Chat?',
+      message: language === 'vi'
+        ? 'Bạn có muốn bắt đầu một cuộc trò chuyện mới? Lịch sử hiện tại sẽ được giữ lại.'
+        : 'Start a new conversation? Current history will be preserved.',
+      confirmText: language === 'vi' ? 'Cuộc trò chuyện mới' : 'New Chat',
+      cancelText: language === 'vi' ? 'Hủy' : 'Cancel',
+      confirmStyle: 'primary',
+      icon: 'chatbubbles',
+      iconColor: '#10b981',
+    });
+    if (!confirmed) return;
+    await clearChatSession();
+    setConversationId(undefined);
+    setMessages([]);
+  }
+
   async function handleRate(messageId: string, rating: 'helpful' | 'not-helpful') {
     setMessages(prev =>
       prev.map(msg =>
@@ -166,7 +259,22 @@ export default function ChatbotScreen() {
   const canSend = input.trim().length > 0 && !sending;
 
   return (
-    <AppShell title={t.chat} subtitle={language === 'vi' ? 'Hỏi về chính sách, HR, IT...' : 'Ask about policies, HR, IT...'}>
+    <AppShell 
+      title={t.chat} 
+      subtitle={language === 'vi' ? 'Hỏi về chính sách, HR, IT...' : 'Ask about policies, HR, IT...'}
+      headerRight={
+        <TouchableOpacity
+          style={styles.newChatBtn}
+          onPress={startNewChat}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="add-circle-outline" size={22} color="#10b981" />
+          <Text style={styles.newChatBtnText}>
+            {language === 'vi' ? 'Mới' : 'New'}
+          </Text>
+        </TouchableOpacity>
+      }
+    >
       <View style={styles.chatBody}>
         <View style={styles.messagesWrapper}>
           {historyLoading ? (
@@ -332,6 +440,49 @@ export default function ChatbotScreen() {
           keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
         >
           <View style={styles.inputSection}>
+            {/* Tag Filter Bar */}
+            {tags.length > 0 && (
+              <View style={styles.tagFilterContainer}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagScrollContent}>
+                  <TouchableOpacity
+                    style={[styles.tagFilterBtn, selectedTagIds.length > 0 && styles.tagFilterBtnActive]}
+                    onPress={() => setShowTagPicker(true)}
+                  >
+                    <Ionicons
+                      name={selectedTagIds.length > 0 ? 'pricetag' : 'pricetag-outline'}
+                      size={14}
+                      color={selectedTagIds.length > 0 ? '#10b981' : '#64748b'}
+                    />
+                    <Text style={[styles.tagFilterBtnText, selectedTagIds.length > 0 && styles.tagFilterBtnTextActive]}>
+                      {selectedTagIds.length > 0
+                        ? `${selectedTagIds.length} ${isVi ? 'tag' : 'tag'}${selectedTagIds.length > 1 ? 's' : ''}`
+                        : isVi ? 'Chọn tag' : 'Select tags'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={14} color={selectedTagIds.length > 0 ? '#10b981' : '#64748b'} />
+                  </TouchableOpacity>
+
+                  {selectedTagIds.map(tagId => {
+                    const tag = tags.find(t => t.id === tagId);
+                    if (!tag) return null;
+                    return (
+                      <View key={tagId} style={styles.selectedTagChip}>
+                        <Text style={styles.selectedTagChipText}>{tag.name}</Text>
+                        <TouchableOpacity onPress={() => toggleTag(tagId)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <Ionicons name="close-circle" size={16} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+
+                  {selectedTagIds.length > 0 && (
+                    <TouchableOpacity style={styles.clearTagsBtn} onPress={clearTags}>
+                      <Ionicons name="close" size={14} color="#f87171" />
+                    </TouchableOpacity>
+                  )}
+                </ScrollView>
+              </View>
+            )}
+
             <View style={styles.inputCard}>
               <TextInput
                 style={styles.input}
@@ -352,6 +503,47 @@ export default function ChatbotScreen() {
             </View>
             <Text style={styles.charCount}>{input.length}/500</Text>
           </View>
+
+          {/* Tag Picker Modal */}
+          <Modal visible={showTagPicker} transparent animationType="fade" onRequestClose={() => setShowTagPicker(false)}>
+            <TouchableWithoutFeedback onPress={() => setShowTagPicker(false)}>
+              <View style={tagModalStyles.overlay}>
+                <TouchableWithoutFeedback>
+                  <View style={tagModalStyles.modalContent}>
+                    <View style={tagModalStyles.header}>
+                      <Text style={tagModalStyles.title}>{isVi ? 'Chọn phạm vi tìm kiếm' : 'Select search scope'}</Text>
+                      <TouchableOpacity onPress={() => setShowTagPicker(false)}>
+                        <Ionicons name="close" size={22} color="#94a3b8" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={tagModalStyles.subtitle}>{isVi ? 'Chọn các tag để giới hạn tài liệu tìm kiếm' : 'Select tags to filter knowledge base'}</Text>
+
+                    <ScrollView style={tagModalStyles.tagList} showsVerticalScrollIndicator={false}>
+                      {tags.map(tag => {
+                        const isSelected = selectedTagIds.includes(tag.id);
+                        return (
+                          <TouchableOpacity
+                            key={tag.id}
+                            style={[tagModalStyles.tagItem, isSelected && tagModalStyles.tagItemSelected]}
+                            onPress={() => toggleTag(tag.id)}
+                          >
+                            <Text style={[tagModalStyles.tagItemText, isSelected && tagModalStyles.tagItemTextSelected]}>
+                              {tag.name}
+                            </Text>
+                            {isSelected && <Ionicons name="checkmark-circle" size={20} color="#10b981" />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+
+                    <TouchableOpacity style={tagModalStyles.doneBtn} onPress={() => setShowTagPicker(false)}>
+                      <Text style={tagModalStyles.doneBtnText}>{isVi ? 'Xong' : 'Done'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableWithoutFeedback>
+              </View>
+            </TouchableWithoutFeedback>
+          </Modal>
         </KeyboardAvoidingView>
       </View>
     </AppShell>
@@ -567,6 +759,60 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginRight: 4,
   },
+
+  // Tag Filter Styles
+  tagFilterContainer: {
+    marginBottom: 10,
+  },
+  tagScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 16,
+  },
+  tagFilterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  tagFilterBtnActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  tagFilterBtnText: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  tagFilterBtnTextActive: {
+    color: '#10b981',
+  },
+  selectedTagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#10b981',
+  },
+  selectedTagChipText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  clearTagsBtn: {
+    padding: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(248, 113, 113, 0.15)',
+  },
+  // Sources section
   sourcesSection: {
     marginTop: 8,
     backgroundColor: '#1e293b',
@@ -657,5 +903,100 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#10b981',
     fontWeight: '500',
+  },
+  // New chat button in header
+  newChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  newChatBtnText: {
+    fontSize: 13,
+    color: '#10b981',
+    fontWeight: '600',
+  },
+});
+
+// Tag Picker Modal Styles
+const tagModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#1e293b',
+    borderRadius: 20,
+    width: '100%',
+    maxWidth: 360,
+    maxHeight: '70%',
+    overflow: 'hidden',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#f1f5f9',
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#94a3b8',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  tagList: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxHeight: 300,
+  },
+  tagItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  tagItemSelected: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+  },
+  tagItemText: {
+    fontSize: 15,
+    color: '#e2e8f0',
+    fontWeight: '500',
+  },
+  tagItemTextSelected: {
+    color: '#10b981',
+    fontWeight: '600',
+  },
+  doneBtn: {
+    margin: 16,
+    marginTop: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#10b981',
+    alignItems: 'center',
+  },
+  doneBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, ActivityIndicator, RefreshControl, Modal, ScrollView, TextInput
+  StyleSheet, ActivityIndicator, RefreshControl, Modal, ScrollView, TextInput, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -10,6 +10,7 @@ import { useLanguageStore, translations } from '../../lib/language-store';
 import { getAccessToken } from '../../lib/auth-store';
 import { API_BASE_URL } from '../../lib/api/config';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../../components/ui/CustomModal';
+import { useNotification } from '../../lib/notification';
 
 interface Tenant {
   id: string;
@@ -44,6 +45,7 @@ export default function StaffOrganizationsScreen() {
   const { language } = useLanguageStore();
   const t = translations[language];
   const isVi = language === 'vi';
+  const { showError } = useNotification();
   
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,10 +154,10 @@ export default function StaffOrganizationsScreen() {
         fetchTenants();
       } else {
         const errData = await res.json().catch(() => null);
-        Alert.alert(t.error, errData?.message || (isVi ? 'Không thể từ chối tổ chức' : 'Cannot reject tenant'));
+        showError(errData?.message || (isVi ? 'Không thể từ chối tổ chức' : 'Cannot reject tenant'), t.error);
       }
     } catch (e) {
-      Alert.alert(t.error, isVi ? 'Đã xảy ra lỗi' : 'An error occurred');
+      showError(isVi ? 'Đã xảy ra lỗi' : 'An error occurred', t.error);
     } finally {
       setProcessing(null);
       setPendingTenantId(null);

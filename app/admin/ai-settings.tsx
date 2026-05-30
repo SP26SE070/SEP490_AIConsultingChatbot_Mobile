@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ActivityIndicator, Alert,
+  View, Text, StyleSheet, ActivityIndicator,
   ScrollView, TouchableOpacity, RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { useFocusEffect } from 'expo-router';
 import { AppShell } from '../../components/layout/AppShell';
 import { useLanguageStore, translations } from '../../lib/language-store';
 import { getChatbotConfig, updateChatbotConfig, type ChatbotMode, type EmbeddingProvider } from '../../lib/api/chatbot-config';
+import { useNotification } from '../../lib/notification';
 
 type ChatbotModeOption = {
   value: ChatbotMode;
@@ -72,6 +73,7 @@ export default function AISettingsScreen() {
   const { language } = useLanguageStore();
   const t = translations[language];
   const isVi = language === 'vi';
+  const { showSuccess, showError } = useNotification();
 
   const [mode, setMode] = useState<ChatbotMode>('BALANCED');
   const [originalMode, setOriginalMode] = useState<ChatbotMode>('BALANCED');
@@ -112,16 +114,10 @@ export default function AISettingsScreen() {
       await updateChatbotConfig({ mode, embeddingProvider });
       setOriginalMode(mode);
       setOriginalEmbeddingProvider(embeddingProvider);
-      Alert.alert(
-        isVi ? 'Thành công' : 'Success',
-        isVi ? 'Đã lưu cài đặt AI' : 'AI settings saved'
-      );
+      showSuccess(isVi ? 'Đã lưu cài đặt AI' : 'AI settings saved', isVi ? 'Thành công' : 'Success');
     } catch (e: any) {
       console.log('Save error:', e);
-      Alert.alert(
-        isVi ? 'Lỗi' : 'Error',
-        isVi ? 'Không thể lưu cài đặt' : 'Failed to save settings'
-      );
+      showError(isVi ? 'Không thể lưu cài đặt' : 'Failed to save settings', isVi ? 'Lỗi' : 'Error');
     } finally {
       setSaving(false);
     }
