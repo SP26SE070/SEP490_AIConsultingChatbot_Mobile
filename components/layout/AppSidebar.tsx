@@ -41,6 +41,7 @@ const ADMIN_NAV: NavItem[] = [
   { href: '/documents', labelKey: 'documents', icon: 'document-text-outline', iconActive: 'document-text' },
   { href: '/analytics', labelKey: 'analytics', icon: 'analytics-outline', iconActive: 'analytics' },
   { href: '/admin/employees', labelKey: 'manageEmployees', icon: 'people-outline', iconActive: 'people' },
+  { href: '/admin/ai-settings', labelKey: 'aiSettings', icon: 'bulb-outline', iconActive: 'bulb' },
   { href: '/admin/subscription', labelKey: 'subscription', icon: 'card-outline', iconActive: 'card' },
 ];
 

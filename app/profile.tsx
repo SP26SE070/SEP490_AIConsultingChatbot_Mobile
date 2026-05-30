@@ -5,7 +5,8 @@ import {
   Alert, ScrollView, Modal, Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getProfile, changePassword, updateProfile, sendOtpForContactEmail, updateContactEmail } from '../lib/api/profile';
+import { router } from 'expo-router';
+import { getProfile, updateProfile, sendOtpForContactEmail, updateContactEmail } from '../lib/api/profile';
 import { AppShell } from '../components/layout/AppShell';
 
 export default function ProfileScreen() {
@@ -31,13 +32,6 @@ export default function ProfileScreen() {
   const [otpSent, setOtpSent] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [updatingEmail, setUpdatingEmail] = useState(false);
-
-  // Change Password
-  const [changingPassword, setChangingPassword] = useState(false);
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     loadProfile();
@@ -212,34 +206,6 @@ export default function ProfileScreen() {
       Alert.alert('Lỗi', e.message || 'Không thể cập nhật email');
     } finally {
       setUpdatingEmail(false);
-    }
-  }
-
-  async function handleChangePassword() {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu mới không khớp');
-      return;
-    }
-    if (newPassword.length < 6) {
-      Alert.alert('Lỗi', 'Mật khẩu mới phải có ít nhất 6 ký tự');
-      return;
-    }
-    try {
-      setChangingPassword(true);
-      await changePassword(currentPassword, newPassword);
-      Alert.alert('Thành công', 'Mật khẩu đã được thay đổi');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setShowPasswordForm(false);
-    } catch (e: any) {
-      Alert.alert('Lỗi', e.message || 'Không thể thay đổi mật khẩu');
-    } finally {
-      setChangingPassword(false);
     }
   }
 
@@ -431,73 +397,17 @@ export default function ProfileScreen() {
           <View style={styles.infoCard}>
             <TouchableOpacity 
               style={styles.menuItem}
-              onPress={() => setShowPasswordForm(!showPasswordForm)}
+              onPress={() => router.push('/change-password')}
             >
               <View style={styles.menuIcon}>
-                <Ionicons name="lock-closed-outline" size={20} color="#10b981" />
+                <Ionicons name="key-outline" size={20} color="#10b981" />
               </View>
               <View style={styles.menuContent}>
                 <Text style={styles.menuTitle}>Đổi mật khẩu</Text>
                 <Text style={styles.menuSubtitle}>Cập nhật mật khẩu mới</Text>
               </View>
-              <Ionicons 
-                name={showPasswordForm ? "chevron-up" : "chevron-forward"} 
-                size={20} 
-                color="#64748b" 
-              />
+              <Ionicons name="chevron-forward" size={20} color="#64748b" />
             </TouchableOpacity>
-
-            {showPasswordForm && (
-              <View style={styles.passwordForm}>
-                <View style={styles.passwordInputWrapper}>
-                  <Ionicons name="key-outline" size={18} color="#64748b" />
-                  <TextInput
-                    style={styles.passwordInput}
-                    placeholder="Mật khẩu hiện tại"
-                    placeholderTextColor="#64748b"
-                    secureTextEntry
-                    value={currentPassword}
-                    onChangeText={setCurrentPassword}
-                  />
-                </View>
-                <View style={styles.passwordInputWrapper}>
-                  <Ionicons name="key-outline" size={18} color="#64748b" />
-                  <TextInput
-                    style={styles.passwordInput}
-                    placeholder="Mật khẩu mới"
-                    placeholderTextColor="#64748b"
-                    secureTextEntry
-                    value={newPassword}
-                    onChangeText={setNewPassword}
-                  />
-                </View>
-                <View style={styles.passwordInputWrapper}>
-                  <Ionicons name="key-outline" size={18} color="#64748b" />
-                  <TextInput
-                    style={styles.passwordInput}
-                    placeholder="Xác nhận mật khẩu mới"
-                    placeholderTextColor="#64748b"
-                    secureTextEntry
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                  />
-                </View>
-                <TouchableOpacity
-                  style={[styles.changePassBtn, changingPassword && styles.btnDisabled]}
-                  onPress={handleChangePassword}
-                  disabled={changingPassword}
-                >
-                  {changingPassword ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                      <Text style={styles.changePassBtnText}>Xác nhận đổi mật khẩu</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         </View>
 
@@ -949,44 +859,6 @@ const styles = StyleSheet.create({
   menuSubtitle: {
     color: '#64748b',
     fontSize: 13,
-  },
-  passwordForm: {
-    marginTop: 12,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#334155',
-    gap: 12,
-  },
-  passwordInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  passwordInput: {
-    flex: 1,
-    color: '#f1f5f9',
-    fontSize: 15,
-  },
-  changePassBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#10b981',
-    marginTop: 4,
-  },
-  changePassBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
   },
   btnDisabled: {
     opacity: 0.6,

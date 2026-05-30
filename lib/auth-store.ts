@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 const ACCESS_TOKEN_KEY = 'auth_access_token';
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
 const USER_KEY = 'auth_user';
+const MUST_CHANGE_PASSWORD_KEY = 'auth_must_change_password';
 
 // Platform-aware storage wrapper
 const storage = {
@@ -41,6 +42,10 @@ export async function setAuth(data: any): Promise<void> {
     roles: data.roles,
     permissions: data.permissions ?? [],
   }));
+  // Save mustChangePassword flag
+  if (data.mustChangePassword !== undefined) {
+    await storage.setItem(MUST_CHANGE_PASSWORD_KEY, String(data.mustChangePassword));
+  }
 }
 
 export async function getAccessToken(): Promise<string | null> {
@@ -56,6 +61,7 @@ export async function clearAuth(): Promise<void> {
   await storage.deleteItem(ACCESS_TOKEN_KEY);
   await storage.deleteItem(REFRESH_TOKEN_KEY);
   await storage.deleteItem(USER_KEY);
+  await storage.deleteItem(MUST_CHANGE_PASSWORD_KEY);
 }
 
 export async function getUserRoles(): Promise<string[]> {
@@ -74,4 +80,13 @@ export async function hasPermission(permission: string): Promise<boolean> {
 export async function isRole(role: string): Promise<boolean> {
   const roles = await getUserRoles();
   return roles.includes(role);
+}
+
+export async function mustChangePassword(): Promise<boolean> {
+  const value = await storage.getItem(MUST_CHANGE_PASSWORD_KEY);
+  return value === 'true';
+}
+
+export async function clearMustChangePasswordFlag(): Promise<void> {
+  await storage.deleteItem(MUST_CHANGE_PASSWORD_KEY);
 }

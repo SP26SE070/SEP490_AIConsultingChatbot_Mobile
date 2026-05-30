@@ -129,7 +129,7 @@ export default function ChatbotScreen() {
           msg.id === assistantMessage.id
             ? {
                 ...msg,
-                content: result.response,
+                content: result.answer,
                 sources: result.sources,
                 responseTimeMs: result.responseTimeMs,
               }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert,
+  StyleSheet, ActivityIndicator,
   KeyboardAvoidingView, Platform,
   Animated, Dimensions, StatusBar
 } from 'react-native';
@@ -12,6 +12,7 @@ import { login } from '../lib/api/auth';
 import { setAuth } from '../lib/auth-store';
 import { useLanguageStore, translations } from '../lib/language-store';
 import { AppLogo } from '../components/brand/AppLogo';
+import { ErrorModal } from '../components/ui/CustomModal';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -20,7 +21,10 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const { language } = useLanguageStore();
+  const isVi = language === 'vi';
   const t = translations[language];
 
   // Animation values
@@ -61,7 +65,8 @@ export default function LoginScreen() {
 
   async function handleLogin() {
     if (!email.trim() || !password.trim()) {
-      Alert.alert(t.error, language === 'vi' ? 'Vui lòng nhập đầy đủ thông tin' : 'Please fill in all fields');
+      setErrorMessage(isVi ? 'Vui lòng nhập đầy đủ thông tin.' : 'Please fill in all fields.');
+      setShowErrorModal(true);
       return;
     }
     setLoading(true);
@@ -70,16 +75,21 @@ export default function LoginScreen() {
       await setAuth(data);
 
       const roles: string[] = data.roles ?? [];
+      
+      // Check if user must change password - redirect directly
+      if (data.mustChangePassword) {
+        router.replace('/change-password');
+        return;
+      }
+
       if (roles.includes('ROLE_STAFF')) {
         router.replace('/staff');
       } else {
         router.replace('/chatbot');
       }
     } catch (e: any) {
-      Alert.alert(
-        t.error,
-        e.message || (language === 'vi' ? 'Vui lòng kiểm tra lại email và mật khẩu.' : 'Please check your email and password.')
-      );
+      setErrorMessage(e.message || (isVi ? 'Vui lòng kiểm tra lại email và mật khẩu.' : 'Please check your email and password.'));
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
     }
@@ -229,8 +239,31 @@ export default function LoginScreen() {
               )}
             </LinearGradient>
           </TouchableOpacity>
+
+          {/* Register Link */}
+          <TouchableOpacity
+            style={styles.registerLink}
+            onPress={() => router.push('/register')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.registerText}>
+              {isVi ? 'Chưa có tài khoản? ' : 'Don\'t have an account? '}
+              <Text style={styles.registerTextBold}>
+                {isVi ? 'Đăng ký ngay' : 'Register now'}
+              </Text>
+            </Text>
+          </TouchableOpacity>
         </Animated.View>
       </KeyboardAvoidingView>
+
+      {/* Error Modal */}
+      <ErrorModal
+        visible={showErrorModal}
+        title={t.error}
+        message={errorMessage}
+        buttonText={isVi ? 'Đóng' : 'Close'}
+        onClose={() => setShowErrorModal(false)}
+      />
     </View>
   );
 }
@@ -275,10 +308,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 185, 129, 0.05)',
   },
   topSection: {
-    paddingTop: 80,
+    paddingTop: 60,
     paddingHorizontal: 32,
-    paddingBottom: 32,
+    paddingBottom: 24,
     alignItems: 'center',
+    minHeight: 380,
   },
   logoWrapper: {
     alignItems: 'center',
@@ -382,6 +416,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#10b981',
     fontWeight: '500',
+  },
+  registerLink: {
+    marginTop: 20,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  registerText: {
+    fontSize: 14,
+    color: '#94a3b8',
+  },
+  registerTextBold: {
+    color: '#10b981',
+    fontWeight: '600',
   },
   button: {
     borderRadius: 14,

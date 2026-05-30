@@ -12,11 +12,14 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="splash" />
           <Stack.Screen name="login" />
+          <Stack.Screen name="register" />
+          <Stack.Screen name="change-password" />
           <Stack.Screen name="chatbot" />
           <Stack.Screen name="history" />
           <Stack.Screen name="documents" />
           <Stack.Screen name="analytics" />
           <Stack.Screen name="profile" />
+          <Stack.Screen name="admin/ai-settings" />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

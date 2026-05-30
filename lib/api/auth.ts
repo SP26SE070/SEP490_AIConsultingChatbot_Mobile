@@ -1,6 +1,16 @@
 import { AUTH_BASE } from './config';
 
-export async function login(email: string, password: string) {
+export interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+  id: string;
+  email: string;
+  tenantId: string;
+  roles: string[];
+  mustChangePassword?: boolean;
+}
+
+export async function login(email: string, password: string): Promise<LoginResponse> {
   const res = await fetch(`${AUTH_BASE}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

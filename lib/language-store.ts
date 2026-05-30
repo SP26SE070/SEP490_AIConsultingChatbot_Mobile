@@ -60,6 +60,7 @@ export const translations = {
     manageEmployees: 'Quản lý nhân viên',
     approveTenant: 'Duyệt tổ chức',
     subscription: 'ĐĂNG KÝ GÓI',
+    aiSettings: 'Cài đặt AI',
 
     // App
     appTitle: 'AI Chatbot',
@@ -237,6 +238,7 @@ export const translations = {
     analytics: 'Analytics',
     profile: 'Profile',
     newChat: 'New Chat',
+    aiSettings: 'AI Settings',
 
     // App
     appTitle: 'AI Chatbot',

@@ -1,13 +1,15 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, RefreshControl, Modal, ScrollView
+  StyleSheet, ActivityIndicator, RefreshControl, Modal, ScrollView, TextInput
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { AppShell } from '../../components/layout/AppShell';
 import { useLanguageStore, translations } from '../../lib/language-store';
 import { getAccessToken } from '../../lib/auth-store';
+import { API_BASE_URL } from '../../lib/api/config';
+import { ConfirmModal, SuccessModal, ErrorModal } from '../../components/ui/CustomModal';
 
 interface Tenant {
   id: string;
@@ -28,6 +30,7 @@ interface Tenant {
   reviewedAt?: string;
   rejectionReason?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 const STATUS_CONFIG = {
@@ -40,6 +43,7 @@ const STATUS_CONFIG = {
 export default function StaffOrganizationsScreen() {
   const { language } = useLanguageStore();
   const t = translations[language];
+  const isVi = language === 'vi';
   
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,13 +51,24 @@ export default function StaffOrganizationsScreen() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [pendingTenantId, setPendingTenantId] = useState<string | null>(null);
 
-  const API_BASE = 'http://10.0.2.2:8080/api/v1';
+  // Modal states
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+  const [showResendConfirm, setShowResendConfirm] = useState(false);
+  const [showSuspendConfirm, setShowSuspendConfirm] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [pendingActionId, setPendingActionId] = useState<string | null>(null);
 
   async function fetchTenants() {
     try {
       const token = await getAccessToken();
-      const res = await fetch(`${API_BASE}/staff/tenants`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/staff/tenants`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch');
@@ -80,76 +95,155 @@ export default function StaffOrganizationsScreen() {
   }
 
   async function handleApprove(tenantId: string, closeAfter = false) {
-    Alert.alert(
-      language === 'vi' ? 'Xác nhận duyệt' : 'Confirm Approval',
-      language === 'vi' ? 'Bạn có chắc muốn duyệt tổ chức này?' : 'Are you sure you want to approve this tenant?',
-      [
-        { text: t.cancel, style: 'cancel' },
-        {
-          text: language === 'vi' ? 'Duyệt' : 'Approve',
-          onPress: async () => {
-            setProcessing(tenantId);
-            try {
-              const token = await getAccessToken();
-              const res = await fetch(`${API_BASE}/staff/tenants/${tenantId}/approve`, {
-                method: 'PUT',
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              if (res.ok) {
-                if (closeAfter) {
-                  setDetailModalOpen(false);
-                  setSelectedTenant(null);
-                }
-                fetchTenants();
-              } else {
-                Alert.alert(t.error, language === 'vi' ? 'Không thể duyệt tổ chức' : 'Cannot approve tenant');
-              }
-            } catch (e) {
-              Alert.alert(t.error, language === 'vi' ? 'Đã xảy ra lỗi' : 'An error occurred');
-            } finally {
-              setProcessing(null);
-            }
-          },
-        },
-      ]
-    );
+    setProcessing(tenantId);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${API_BASE_URL}/api/v1/staff/tenants/${tenantId}/approve`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setSuccessMessage(isVi ? 'Đã duyệt tổ chức. Email với thông tin đăng nhập đã được gửi.' : 'Tenant approved. Email with login information has been sent.');
+        setShowSuccessModal(true);
+        if (closeAfter) {
+          setDetailModalOpen(false);
+          setSelectedTenant(null);
+        }
+        fetchTenants();
+      } else {
+        const errData = await res.json().catch(() => null);
+        setErrorMessage(errData?.message || (isVi ? 'Không thể duyệt tổ chức' : 'Cannot approve tenant'));
+        setShowErrorModal(true);
+      }
+    } catch (e) {
+      setErrorMessage(isVi ? 'Đã xảy ra lỗi' : 'An error occurred');
+      setShowErrorModal(true);
+    } finally {
+      setProcessing(null);
+    }
   }
 
-  async function handleReject(tenantId: string, closeAfter = false) {
-    Alert.alert(
-      language === 'vi' ? 'Xác nhận từ chối' : 'Confirm Rejection',
-      language === 'vi' ? 'Bạn có chắc muốn từ chối tổ chức này?' : 'Are you sure you want to reject this tenant?',
-      [
-        { text: t.cancel, style: 'cancel' },
-        {
-          text: language === 'vi' ? 'Từ chối' : 'Reject',
-          style: 'destructive',
-          onPress: async () => {
-            setProcessing(tenantId);
-            try {
-              const token = await getAccessToken();
-              const res = await fetch(`${API_BASE}/staff/tenants/${tenantId}/reject`, {
-                method: 'PUT',
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              if (res.ok) {
-                if (closeAfter) {
-                  setDetailModalOpen(false);
-                  setSelectedTenant(null);
-                }
-                fetchTenants();
-              } else {
-                Alert.alert(t.error, language === 'vi' ? 'Không thể từ chối tổ chức' : 'Cannot reject tenant');
-              }
-            } catch (e) {
-              Alert.alert(t.error, language === 'vi' ? 'Đã xảy ra lỗi' : 'An error occurred');
-            } finally {
-              setProcessing(null);
-            }
-          },
-        },
-      ]
-    );
+  function openApproveConfirm(tenantId: string) {
+    setPendingActionId(tenantId);
+    setShowApproveConfirm(true);
+  }
+
+  function openRejectModal(tenantId: string) {
+    setPendingTenantId(tenantId);
+    setRejectReason('');
+    setShowRejectModal(true);
+  }
+
+  async function handleReject() {
+    if (!pendingTenantId) return;
+    
+    setProcessing(pendingTenantId);
+    try {
+      const token = await getAccessToken();
+      const reasonParam = rejectReason.trim() ? `?reason=${encodeURIComponent(rejectReason.trim())}` : '';
+      const res = await fetch(`${API_BASE_URL}/api/v1/staff/tenants/${pendingTenantId}/reject${reasonParam}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setShowRejectModal(false);
+        setDetailModalOpen(false);
+        setSelectedTenant(null);
+        fetchTenants();
+      } else {
+        const errData = await res.json().catch(() => null);
+        Alert.alert(t.error, errData?.message || (isVi ? 'Không thể từ chối tổ chức' : 'Cannot reject tenant'));
+      }
+    } catch (e) {
+      Alert.alert(t.error, isVi ? 'Đã xảy ra lỗi' : 'An error occurred');
+    } finally {
+      setProcessing(null);
+      setPendingTenantId(null);
+    }
+  }
+
+  async function handleResendCredentials(tenantId: string) {
+    setProcessing(tenantId);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${API_BASE_URL}/api/v1/staff/tenants/${tenantId}/resend-credentials`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setSuccessMessage(isVi ? 'Đã gửi lại thông tin đăng nhập qua email.' : 'Login information has been resent via email.');
+        setShowSuccessModal(true);
+      } else {
+        const errData = await res.json().catch(() => null);
+        setErrorMessage(errData?.message || (isVi ? 'Không thể gửi lại' : 'Cannot resend'));
+        setShowErrorModal(true);
+      }
+    } catch (e) {
+      setErrorMessage(isVi ? 'Đã xảy ra lỗi' : 'An error occurred');
+      setShowErrorModal(true);
+    } finally {
+      setProcessing(null);
+    }
+  }
+
+  function openResendConfirm(tenantId: string) {
+    setPendingActionId(tenantId);
+    setShowResendConfirm(true);
+  }
+
+  async function handleSuspend(tenantId: string) {
+    setProcessing(tenantId);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${API_BASE_URL}/api/v1/staff/tenants/${tenantId}/suspend`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setDetailModalOpen(false);
+        setSelectedTenant(null);
+        fetchTenants();
+      } else {
+        const errData = await res.json().catch(() => null);
+        setErrorMessage(errData?.message || (isVi ? 'Không thể tạm ngưng' : 'Cannot suspend'));
+        setShowErrorModal(true);
+      }
+    } catch (e) {
+      setErrorMessage(isVi ? 'Đã xảy ra lỗi' : 'An error occurred');
+      setShowErrorModal(true);
+    } finally {
+      setProcessing(null);
+    }
+  }
+
+  function openSuspendConfirm(tenantId: string) {
+    setPendingActionId(tenantId);
+    setShowSuspendConfirm(true);
+  }
+
+  async function handleActivate(tenantId: string) {
+    setProcessing(tenantId);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${API_BASE_URL}/api/v1/staff/tenants/${tenantId}/activate`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setDetailModalOpen(false);
+        setSelectedTenant(null);
+        fetchTenants();
+      } else {
+        const errData = await res.json().catch(() => null);
+        setErrorMessage(errData?.message || (isVi ? 'Không thể kích hoạt' : 'Cannot activate'));
+        setShowErrorModal(true);
+      }
+    } catch (e) {
+      setErrorMessage(isVi ? 'Đã xảy ra lỗi' : 'An error occurred');
+      setShowErrorModal(true);
+    } finally {
+      setProcessing(null);
+    }
   }
 
   function onRefresh() {
@@ -159,7 +253,7 @@ export default function StaffOrganizationsScreen() {
 
   function formatDate(dateStr?: string) {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', {
+    return new Date(dateStr).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -174,7 +268,7 @@ export default function StaffOrganizationsScreen() {
 
   if (loading) {
     return (
-      <AppShell title={t.approveTenant} subtitle={language === 'vi' ? 'Quản lý tổ chức' : 'Manage Tenants'}>
+      <AppShell title={t.approveTenant} subtitle={isVi ? 'Quản lý tổ chức' : 'Manage Tenants'}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#10b981" />
           <Text style={styles.loadingText}>{t.loading}</Text>
@@ -184,7 +278,7 @@ export default function StaffOrganizationsScreen() {
   }
 
   return (
-    <AppShell title={t.approveTenant} subtitle={language === 'vi' ? 'Quản lý tổ chức' : 'Manage Tenants'}>
+    <AppShell title={t.approveTenant} subtitle={isVi ? 'Quản lý tổ chức' : 'Manage Tenants'}>
       {/* Summary Stats */}
       <View style={styles.summaryRow}>
         <View style={[styles.summaryCard, { backgroundColor: 'rgba(245, 158, 11, 0.08)' }]}>
@@ -192,21 +286,21 @@ export default function StaffOrganizationsScreen() {
             <Ionicons name="time-outline" size={18} color="#f59e0b" />
           </View>
           <Text style={styles.summaryValue}>{pendingCount}</Text>
-          <Text style={styles.summaryLabel}>{language === 'vi' ? 'Chờ duyệt' : 'Pending'}</Text>
+          <Text style={styles.summaryLabel}>{isVi ? 'Chờ duyệt' : 'Pending'}</Text>
         </View>
         <View style={[styles.summaryCard, { backgroundColor: 'rgba(34, 197, 94, 0.08)' }]}>
           <View style={[styles.summaryIconWrap, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
             <Ionicons name="checkmark-circle-outline" size={18} color="#22c55e" />
           </View>
           <Text style={styles.summaryValue}>{tenants.filter(t => t.status === 'ACTIVE').length}</Text>
-          <Text style={styles.summaryLabel}>{language === 'vi' ? 'Hoạt động' : 'Active'}</Text>
+          <Text style={styles.summaryLabel}>{isVi ? 'Hoạt động' : 'Active'}</Text>
         </View>
         <View style={[styles.summaryCard, { backgroundColor: 'rgba(148, 163, 184, 0.08)' }]}>
           <View style={[styles.summaryIconWrap, { backgroundColor: 'rgba(148, 163, 184, 0.15)' }]}>
             <Ionicons name="business-outline" size={18} color="#94a3b8" />
           </View>
           <Text style={styles.summaryValue}>{tenants.length}</Text>
-          <Text style={styles.summaryLabel}>{language === 'vi' ? 'Tổng cộng' : 'Total'}</Text>
+          <Text style={styles.summaryLabel}>{isVi ? 'Tổng cộng' : 'Total'}</Text>
         </View>
       </View>
 
@@ -223,8 +317,8 @@ export default function StaffOrganizationsScreen() {
             <View style={styles.emptyIconWrap}>
               <Ionicons name="business-outline" size={40} color="#10b981" />
             </View>
-            <Text style={styles.emptyTitle}>{language === 'vi' ? 'Chưa có tổ chức nào' : 'No organizations yet'}</Text>
-            <Text style={styles.emptySubtitle}>{language === 'vi' ? 'Danh sách tổ chức đăng ký sẽ xuất hiện tại đây' : 'Registered organizations will appear here'}</Text>
+            <Text style={styles.emptyTitle}>{isVi ? 'Chưa có tổ chức nào' : 'No organizations yet'}</Text>
+            <Text style={styles.emptySubtitle}>{isVi ? 'Danh sách tổ chức đăng ký sẽ xuất hiện tại đây' : 'Registered organizations will appear here'}</Text>
           </View>
         }
         renderItem={({ item }) => {
@@ -251,7 +345,7 @@ export default function StaffOrganizationsScreen() {
                 </View>
                 <View style={[styles.statusPill, { backgroundColor: statusInfo.bg }]}>
                   <Text style={[styles.statusPillText, { color: statusInfo.color }]}>
-                    {language === 'vi' ? statusInfo.labelVi : statusInfo.labelEn}
+                    {isVi ? statusInfo.labelVi : statusInfo.labelEn}
                   </Text>
                 </View>
               </View>
@@ -281,15 +375,15 @@ export default function StaffOrganizationsScreen() {
                   <>
                     <TouchableOpacity
                       style={styles.actionReject}
-                      onPress={() => handleReject(item.id)}
+                      onPress={() => openRejectModal(item.id)}
                       disabled={isProcessingThis}
                     >
                       <Ionicons name="close-circle" size={15} color="#f87171" />
-                      <Text style={styles.actionRejectText}>{language === 'vi' ? 'Từ chối' : 'Reject'}</Text>
+                      <Text style={styles.actionRejectText}>{isVi ? 'Từ chối' : 'Reject'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.actionApprove, isProcessingThis && styles.actionDisabled]}
-                      onPress={() => handleApprove(item.id)}
+                      onPress={() => openApproveConfirm(item.id)}
                       disabled={isProcessingThis}
                     >
                       {isProcessingThis ? (
@@ -297,14 +391,14 @@ export default function StaffOrganizationsScreen() {
                       ) : (
                         <>
                           <Ionicons name="checkmark-circle" size={15} color="#fff" />
-                          <Text style={styles.actionApproveText}>{language === 'vi' ? 'Duyệt' : 'Approve'}</Text>
+                          <Text style={styles.actionApproveText}>{isVi ? 'Duyệt' : 'Approve'}</Text>
                         </>
                       )}
                     </TouchableOpacity>
                   </>
                 ) : (
                   <View style={styles.viewDetailRow}>
-                    <Text style={styles.viewDetailText}>{language === 'vi' ? 'Xem chi tiết' : 'View details'}</Text>
+                    <Text style={styles.viewDetailText}>{isVi ? 'Xem chi tiết' : 'View details'}</Text>
                     <Ionicons name="chevron-forward" size={15} color="#10b981" />
                   </View>
                 )}
@@ -323,7 +417,7 @@ export default function StaffOrganizationsScreen() {
       >
         <View style={styles.modalWrap}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalHeaderTitle}>{language === 'vi' ? 'Chi tiết tổ chức' : 'Organization Details'}</Text>
+            <Text style={styles.modalHeaderTitle}>{isVi ? 'Chi tiết tổ chức' : 'Organization Details'}</Text>
             <TouchableOpacity onPress={() => setDetailModalOpen(false)} style={styles.modalCloseBtn}>
               <Ionicons name="close" size={22} color="#f1f5f9" />
             </TouchableOpacity>
@@ -340,7 +434,7 @@ export default function StaffOrganizationsScreen() {
                       <View style={[styles.statusBannerInner, { backgroundColor: info.bg }]}>
                         <Ionicons name={info.icon as any} size={22} color={info.color} />
                         <Text style={[styles.statusBannerText, { color: info.color }]}>
-                          {language === 'vi' ? info.labelVi : info.labelEn}
+                          {isVi ? info.labelVi : info.labelEn}
                         </Text>
                       </View>
                     );
@@ -350,39 +444,39 @@ export default function StaffOrganizationsScreen() {
                 {/* Company Section */}
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>
-                    <Ionicons name="business" size={15} color="#10b981" /> {language === 'vi' ? 'Thông tin công ty' : 'Company Information'}
+                    <Ionicons name="business" size={15} color="#10b981" /> {isVi ? 'Thông tin công ty' : 'Company Information'}
                   </Text>
                   <View style={styles.infoCard}>
-                    <InfoRow label={language === 'vi' ? 'Tên công ty' : 'Company Name'} value={selectedTenant.name} />
-                    <InfoRow label={language === 'vi' ? 'Email liên hệ' : 'Contact Email'} value={selectedTenant.contactEmail} />
-                    {selectedTenant.address && <InfoRow label={language === 'vi' ? 'Địa chỉ' : 'Address'} value={selectedTenant.address} />}
-                    {selectedTenant.website && <InfoRow label={language === 'vi' ? 'Website' : 'Website'} value={selectedTenant.website} isLink />}
-                    {selectedTenant.companySize && <InfoRow label={language === 'vi' ? 'Quy mô' : 'Company Size'} value={selectedTenant.companySize} />}
+                    <InfoRow label={isVi ? 'Tên công ty' : 'Company Name'} value={selectedTenant.name} />
+                    <InfoRow label={isVi ? 'Email liên hệ' : 'Contact Email'} value={selectedTenant.contactEmail} />
+                    {selectedTenant.address && <InfoRow label={isVi ? 'Địa chỉ' : 'Address'} value={selectedTenant.address} />}
+                    {selectedTenant.website && <InfoRow label={isVi ? 'Website' : 'Website'} value={selectedTenant.website} isLink />}
+                    {selectedTenant.companySize && <InfoRow label={isVi ? 'Quy mô' : 'Company Size'} value={selectedTenant.companySize} />}
                   </View>
                 </View>
 
                 {/* Representative Section */}
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>
-                    <Ionicons name="person" size={15} color="#10b981" /> {language === 'vi' ? 'Người đại diện' : 'Representative'}
+                    <Ionicons name="person" size={15} color="#10b981" /> {isVi ? 'Người đại diện' : 'Representative'}
                   </Text>
                   <View style={styles.infoCard}>
-                    {selectedTenant.representativeName && <InfoRow label={language === 'vi' ? 'Họ tên' : 'Full Name'} value={selectedTenant.representativeName} />}
-                    {selectedTenant.representativePosition && <InfoRow label={language === 'vi' ? 'Chức vụ' : 'Position'} value={selectedTenant.representativePosition} />}
-                    {selectedTenant.representativePhone && <InfoRow label={language === 'vi' ? 'Điện thoại' : 'Phone'} value={selectedTenant.representativePhone} />}
+                    {selectedTenant.representativeName && <InfoRow label={isVi ? 'Họ tên' : 'Full Name'} value={selectedTenant.representativeName} />}
+                    {selectedTenant.representativePosition && <InfoRow label={isVi ? 'Chức vụ' : 'Position'} value={selectedTenant.representativePosition} />}
+                    {selectedTenant.representativePhone && <InfoRow label={isVi ? 'Điện thoại' : 'Phone'} value={selectedTenant.representativePhone} />}
                   </View>
                 </View>
 
                 {/* Request Section */}
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>
-                    <Ionicons name="document-text" size={15} color="#10b981" /> {language === 'vi' ? 'Yêu cầu đăng ký' : 'Registration Request'}
+                    <Ionicons name="document-text" size={15} color="#10b981" /> {isVi ? 'Yêu cầu đăng ký' : 'Registration Request'}
                   </Text>
                   <View style={styles.infoCard}>
-                    <InfoRow label={language === 'vi' ? 'Ngày đăng ký' : 'Request Date'} value={formatDate(selectedTenant.requestedAt)} />
+                    <InfoRow label={isVi ? 'Ngày đăng ký' : 'Request Date'} value={formatDate(selectedTenant.requestedAt || selectedTenant.createdAt)} />
                     {selectedTenant.requestMessage && (
                       <View style={styles.messageBox}>
-                        <Text style={styles.messageLabel}>{language === 'vi' ? 'Lời nhắn' : 'Message'}</Text>
+                        <Text style={styles.messageLabel}>{isVi ? 'Lời nhắn' : 'Message'}</Text>
                         <Text style={styles.messageText}>"{selectedTenant.requestMessage}"</Text>
                       </View>
                     )}
@@ -393,17 +487,30 @@ export default function StaffOrganizationsScreen() {
                 {(selectedTenant.reviewedAt || selectedTenant.rejectionReason) && (
                   <View style={styles.section}>
                     <Text style={styles.sectionTitle}>
-                      <Ionicons name="shield-checkmark" size={15} color="#10b981" /> {language === 'vi' ? 'Thông tin duyệt' : 'Review Information'}
+                      <Ionicons name="shield-checkmark" size={15} color="#10b981" /> {isVi ? 'Thông tin duyệt' : 'Review Information'}
                     </Text>
                     <View style={styles.infoCard}>
-                      {selectedTenant.reviewedAt && <InfoRow label={language === 'vi' ? 'Ngày duyệt' : 'Reviewed At'} value={formatDate(selectedTenant.reviewedAt)} />}
+                      {selectedTenant.approvedByName && <InfoRow label={isVi ? 'Người duyệt' : 'Approved By'} value={selectedTenant.approvedByName} />}
+                      {selectedTenant.rejectedByName && <InfoRow label={isVi ? 'Người từ chối' : 'Rejected By'} value={selectedTenant.rejectedByName} />}
+                      {selectedTenant.reviewedAt && <InfoRow label={isVi ? 'Ngày duyệt' : 'Reviewed At'} value={formatDate(selectedTenant.reviewedAt)} />}
                       {selectedTenant.rejectionReason && (
                         <View style={styles.messageBox}>
-                          <Text style={styles.messageLabel}>{language === 'vi' ? 'Lý do từ chối' : 'Rejection Reason'}</Text>
+                          <Text style={styles.messageLabel}>{isVi ? 'Lý do từ chối' : 'Rejection Reason'}</Text>
                           <Text style={styles.messageText}>{selectedTenant.rejectionReason}</Text>
                         </View>
                       )}
                     </View>
+                  </View>
+                )}
+
+                {/* Login Info Notice */}
+                {selectedTenant.status === 'ACTIVE' && (
+                  <View style={styles.loginInfoNotice}>
+                    <Ionicons name="mail-outline" size={20} color="#3b82f6" />
+                    <Text style={styles.loginInfoText}>
+                      {isVi ? 'Thông tin đăng nhập đã được gửi qua email đến' : 'Login credentials have been sent via email to'}
+                      {' '}{selectedTenant.contactEmail}
+                    </Text>
                   </View>
                 )}
               </>
@@ -411,34 +518,200 @@ export default function StaffOrganizationsScreen() {
           </ScrollView>
 
           {/* Modal Actions */}
-          {selectedTenant?.status === 'PENDING' && (
+          {selectedTenant && (
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.actionRejectLarge}
-                onPress={() => handleReject(selectedTenant.id, true)}
-                disabled={processing === selectedTenant.id}
-              >
-                <Ionicons name="close-circle" size={20} color="#f87171" />
-                <Text style={styles.actionRejectLargeText}>{language === 'vi' ? 'Từ chối' : 'Reject'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionApproveLarge, processing === selectedTenant.id && styles.actionDisabled]}
-                onPress={() => handleApprove(selectedTenant.id, true)}
-                disabled={processing === selectedTenant.id}
-              >
-                {processing === selectedTenant.id ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                    <Text style={styles.actionApproveLargeText}>{language === 'vi' ? 'Duyệt tổ chức' : 'Approve'}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              {selectedTenant.status === 'PENDING' && (
+                <>
+                  <TouchableOpacity
+                    style={styles.actionRejectLarge}
+                    onPress={() => {
+                      setDetailModalOpen(false);
+                      openRejectModal(selectedTenant.id);
+                    }}
+                    disabled={processing === selectedTenant.id}
+                  >
+                    <Ionicons name="close-circle" size={20} color="#f87171" />
+                    <Text style={styles.actionRejectLargeText}>{isVi ? 'Từ chối' : 'Reject'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionApproveLarge, processing === selectedTenant.id && styles.actionDisabled]}
+                    onPress={() => openApproveConfirm(selectedTenant.id)}
+                    disabled={processing === selectedTenant.id}
+                  >
+                    {processing === selectedTenant.id ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                        <Text style={styles.actionApproveLargeText}>{isVi ? 'Duyệt tổ chức' : 'Approve'}</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+              {selectedTenant.status === 'ACTIVE' && (
+                <>
+                  <TouchableOpacity
+                    style={styles.actionResend}
+                    onPress={() => openResendConfirm(selectedTenant.id)}
+                    disabled={processing === selectedTenant.id}
+                  >
+                    {processing === selectedTenant.id ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="mail-outline" size={20} color="#fff" />
+                        <Text style={styles.actionResendText}>{isVi ? 'Gửi lại thông tin' : 'Resend Credentials'}</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionSuspendLarge}
+                    onPress={() => openSuspendConfirm(selectedTenant.id)}
+                    disabled={processing === selectedTenant.id}
+                  >
+                    <Ionicons name="pause-circle" size={20} color="#f87171" />
+                    <Text style={styles.actionSuspendLargeText}>{isVi ? 'Tạm ngưng' : 'Suspend'}</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              {selectedTenant.status === 'SUSPENDED' && (
+                <>
+                  <TouchableOpacity
+                    style={styles.actionActivateLarge}
+                    onPress={() => handleActivate(selectedTenant.id)}
+                    disabled={processing === selectedTenant.id}
+                  >
+                    {processing === selectedTenant.id ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="play-circle" size={20} color="#fff" />
+                        <Text style={styles.actionActivateLargeText}>{isVi ? 'Kích hoạt lại' : 'Activate'}</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           )}
         </View>
       </Modal>
+
+      {/* Reject Reason Modal */}
+      <Modal
+        visible={showRejectModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowRejectModal(false)}
+      >
+        <View style={styles.rejectModalOverlay}>
+          <View style={styles.rejectModalContent}>
+            <View style={styles.rejectModalHeader}>
+              <Text style={styles.rejectModalTitle}>{isVi ? 'Lý do từ chối' : 'Rejection Reason'}</Text>
+              <TouchableOpacity onPress={() => setShowRejectModal(false)}>
+                <Ionicons name="close" size={22} color="#f1f5f9" />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.rejectInput}
+              placeholder={isVi ? 'Nhập lý do từ chối (tùy chọn)' : 'Enter rejection reason (optional)'}
+              placeholderTextColor="#64748b"
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+            <View style={styles.rejectModalActions}>
+              <TouchableOpacity
+                style={styles.rejectCancelBtn}
+                onPress={() => setShowRejectModal(false)}
+              >
+                <Text style={styles.rejectCancelText}>{isVi ? 'Hủy' : 'Cancel'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.rejectConfirmBtn}
+                onPress={handleReject}
+                disabled={processing === pendingTenantId}
+              >
+                {processing === pendingTenantId ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.rejectConfirmText}>{isVi ? 'Xác nhận từ chối' : 'Confirm Reject'}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Approve Confirmation Modal */}
+      <ConfirmModal
+        visible={showApproveConfirm}
+        title={isVi ? 'Xác nhận duyệt' : 'Confirm Approval'}
+        message={isVi ? 'Bạn có chắc muốn duyệt tổ chức này? Thông tin đăng nhập sẽ được gửi qua email.' : 'Are you sure you want to approve this tenant? Login information will be sent via email.'}
+        confirmText={isVi ? 'Duyệt' : 'Approve'}
+        icon="checkmark-circle"
+        iconColor="#10b981"
+        onConfirm={() => {
+          setShowApproveConfirm(false);
+          if (pendingActionId) handleApprove(pendingActionId, true);
+        }}
+        onCancel={() => setShowApproveConfirm(false)}
+        loading={processing === pendingActionId}
+      />
+
+      {/* Resend Credentials Confirmation Modal */}
+      <ConfirmModal
+        visible={showResendConfirm}
+        title={isVi ? 'Gửi lại thông tin' : 'Resend Credentials'}
+        message={isVi ? 'Gửi lại email chứa thông tin đăng nhập cho tổ chức này?' : 'Resend email with login information to this organization?'}
+        confirmText={isVi ? 'Gửi' : 'Send'}
+        icon="mail"
+        iconColor="#3b82f6"
+        onConfirm={() => {
+          setShowResendConfirm(false);
+          if (pendingActionId) handleResendCredentials(pendingActionId);
+        }}
+        onCancel={() => setShowResendConfirm(false)}
+        loading={processing === pendingActionId}
+      />
+
+      {/* Suspend Confirmation Modal */}
+      <ConfirmModal
+        visible={showSuspendConfirm}
+        title={isVi ? 'Tạm ngưng tổ chức' : 'Suspend Organization'}
+        message={isVi ? 'Bạn có chắc muốn tạm ngưng tổ chức này?' : 'Are you sure you want to suspend this organization?'}
+        confirmText={isVi ? 'Tạm ngưng' : 'Suspend'}
+        confirmStyle="danger"
+        icon="pause-circle"
+        iconColor="#f87171"
+        onConfirm={() => {
+          setShowSuspendConfirm(false);
+          if (pendingActionId) handleSuspend(pendingActionId);
+        }}
+        onCancel={() => setShowSuspendConfirm(false)}
+        loading={processing === pendingActionId}
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        visible={showSuccessModal}
+        title={isVi ? 'Thành công' : 'Success'}
+        message={successMessage}
+        buttonText={isVi ? 'Đã hiểu' : 'Got it'}
+        onClose={() => setShowSuccessModal(false)}
+      />
+
+      {/* Error Modal */}
+      <ErrorModal
+        visible={showErrorModal}
+        title={isVi ? 'Đã xảy ra lỗi' : 'Error'}
+        message={errorMessage}
+        buttonText={isVi ? 'Đóng' : 'Close'}
+        onClose={() => setShowErrorModal(false)}
+      />
     </AppShell>
   );
 }
@@ -524,6 +797,9 @@ const styles = StyleSheet.create({
   messageBox: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: 'rgba(148, 163, 184, 0.1)' },
   messageLabel: { fontSize: 12, color: '#64748b', marginBottom: 6 },
   messageText: { fontSize: 13, color: '#f1f5f9', fontStyle: 'italic', lineHeight: 20 },
+
+  loginInfoNotice: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.2)' },
+  loginInfoText: { flex: 1, fontSize: 13, color: '#93c5fd', lineHeight: 18 },
   
   // Modal Actions
   modalActions: { flexDirection: 'row', gap: 12, padding: 16, borderTopWidth: 1, borderTopColor: '#1e293b' },
@@ -531,4 +807,22 @@ const styles = StyleSheet.create({
   actionRejectLargeText: { fontSize: 14, color: '#f87171', fontWeight: '600' },
   actionApproveLarge: { flex: 1.4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12, backgroundColor: '#10b981' },
   actionApproveLargeText: { fontSize: 14, color: '#fff', fontWeight: '600' },
+  actionResend: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12, backgroundColor: '#3b82f6' },
+  actionResendText: { fontSize: 14, color: '#fff', fontWeight: '600' },
+  actionSuspendLarge: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12, backgroundColor: 'rgba(248, 113, 113, 0.12)', borderWidth: 1, borderColor: 'rgba(248, 113, 113, 0.2)' },
+  actionSuspendLargeText: { fontSize: 14, color: '#f87171', fontWeight: '600' },
+  actionActivateLarge: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12, backgroundColor: '#10b981' },
+  actionActivateLargeText: { fontSize: 14, color: '#fff', fontWeight: '600' },
+
+  // Reject Modal
+  rejectModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  rejectModalContent: { backgroundColor: '#1e293b', borderRadius: 16, padding: 20, width: '100%', maxWidth: 400 },
+  rejectModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  rejectModalTitle: { fontSize: 18, fontWeight: '700', color: '#f1f5f9' },
+  rejectInput: { backgroundColor: '#0f172a', borderRadius: 12, padding: 14, fontSize: 15, color: '#f1f5f9', minHeight: 100, textAlignVertical: 'top', marginBottom: 16, borderWidth: 1, borderColor: '#334155' },
+  rejectModalActions: { flexDirection: 'row', gap: 12 },
+  rejectCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: '#334155', alignItems: 'center' },
+  rejectCancelText: { fontSize: 14, color: '#94a3b8', fontWeight: '600' },
+  rejectConfirmBtn: { flex: 1.5, paddingVertical: 14, borderRadius: 12, backgroundColor: '#f87171', alignItems: 'center' },
+  rejectConfirmText: { fontSize: 14, color: '#fff', fontWeight: '600' },
 });

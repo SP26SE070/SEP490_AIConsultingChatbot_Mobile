@@ -12,7 +12,8 @@ import { useFocusEffect } from 'expo-router';
 import { AppShell } from '../components/layout/AppShell';
 import { useLanguageStore, translations } from '../lib/language-store';
 import { getAccessToken } from '../lib/auth-store';
-import { KNOWLEDGE_BASE, CATEGORIES_BASE, TAGS_BASE, TENANT_ADMIN_BASE } from '../lib/api/config';
+import { KNOWLEDGE_BASE, CATEGORIES_BASE, TAGS_BASE } from '../lib/api/config';
+import { TENANT_ADMIN_BASE } from '../lib/api/config';
 
 const API_TIMEOUT = 15000;
 const DOWNLOAD_HISTORY_KEY = 'download_history';
@@ -161,6 +162,9 @@ export default function DocumentsScreen() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
+  const [previewContent, setPreviewContent] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadDescription, setUploadDescription] = useState('');
@@ -219,25 +223,41 @@ export default function DocumentsScreen() {
     }, [])
   );
   
-  // Reload data when upload modal opens
-  useFocusEffect(
-    useCallback(() => {
-      if (showUploadModal) {
-        // Reset form
-        setUploadTitle('');
-        setUploadDescription('');
-        setUploadFile(null);
-        setUploadCategory('');
-        setUploadTags([]);
-        setUploadDepartments([]);
-        setUploadRoles([]);
-        setUploadMinRoleLevel(1);
-        setUploadVisibility('COMPANY_WIDE');
-        // Reload categories, tags, departments, roles
-        loadMetadata();
-      }
-    }, [showUploadModal])
-  );
+  // Normalize department (giống FE)
+  function normalizeDepartment(raw: any): Department {
+    const idRaw = raw.id ?? raw.department_id ?? raw.departmentId;
+    const id = Number(idRaw);
+    return {
+      id: Number.isFinite(id) ? id : 0,
+      name: raw.name || raw.departmentName || '',
+      code: raw.code || raw.departmentCode || '',
+    };
+  }
+  
+  // Normalize role (giống FE)
+  function normalizeRole(raw: any): Role {
+    const idRaw = raw.id ?? raw.role_id ?? raw.roleId;
+    const id = Number(idRaw);
+    return {
+      id: Number.isFinite(id) ? id : 0,
+      name: raw.name || raw.roleName || '',
+      code: raw.code || raw.roleCode || '',
+      level: Number.isFinite(raw.level) ? raw.level : 1,
+    };
+  }
+  
+  // Normalize list (giống FE)
+  function normalizeList(data: any, normalizeFn: (item: any) => any) {
+    if (Array.isArray(data)) {
+      return data.map(normalizeFn).filter((item: any) => item.id > 0);
+    }
+    if (data && typeof data === 'object') {
+      const inner = data.content ?? data.data ?? data.departments ?? data.roles ?? data.items;
+      if (Array.isArray(inner)) return inner.map(normalizeFn).filter((item: any) => item.id > 0);
+      if (inner && typeof inner === 'object') return normalizeList(inner, normalizeFn);
+    }
+    return [];
+  }
   
   // Load metadata for upload form
   async function loadMetadata() {
@@ -245,8 +265,8 @@ export default function DocumentsScreen() {
       const [catsResult, tagsResult, deptsResult, rolesResult] = await Promise.allSettled([
         apiRequest(`${KNOWLEDGE_BASE}/categories/manage`),
         apiRequest(`${TAGS_BASE}/active`),
-        apiRequest(`${TENANT_ADMIN_BASE}/departments/active`),
-        apiRequest(`${TENANT_ADMIN_BASE}/roles`),
+        apiRequest(`${KNOWLEDGE_BASE}/documents/access-scope/departments`),
+        apiRequest(`${KNOWLEDGE_BASE}/documents/access-scope/roles`),
       ]);
       
       if (catsResult.status === 'fulfilled' && catsResult.value.ok) {
@@ -265,16 +285,16 @@ export default function DocumentsScreen() {
       
       if (deptsResult.status === 'fulfilled' && deptsResult.value.ok) {
         const deptsData = await deptsResult.value.json();
-        if (Array.isArray(deptsData)) setDepartments(deptsData);
-        else if (deptsData?.content) setDepartments(deptsData.content);
-        else if (deptsData?.data) setDepartments(deptsData.data);
+        const depts = normalizeList(deptsData, normalizeDepartment);
+        console.log('Departments parsed:', depts.length, depts);
+        setDepartments(depts);
       }
       
       if (rolesResult.status === 'fulfilled' && rolesResult.value.ok) {
         const rolesData = await rolesResult.value.json();
-        if (Array.isArray(rolesData)) setRoles(rolesData);
-        else if (rolesData?.content) setRoles(rolesData.content);
-        else if (rolesData?.data) setRoles(rolesData.data);
+        const roles = normalizeList(rolesData, normalizeRole);
+        console.log('Roles parsed:', roles.length, roles);
+        setRoles(roles);
       }
     } catch (e) {
       console.log('Load metadata error:', e);
@@ -346,26 +366,16 @@ export default function DocumentsScreen() {
       
       if (deptsResult.status === 'fulfilled' && deptsResult.value.ok) {
         const deptsData = await deptsResult.value.json();
-        console.log('Departments data:', JSON.stringify(deptsData)?.substring(0, 500));
-        if (Array.isArray(deptsData)) {
-          setDepartments(deptsData);
-        } else if (deptsData?.content) {
-          setDepartments(deptsData.content);
-        } else if (deptsData?.data) {
-          setDepartments(deptsData.data);
-        }
+        const depts = normalizeList(deptsData, normalizeDepartment);
+        console.log('Departments parsed:', depts.length, depts);
+        setDepartments(depts);
       }
       
       if (rolesResult.status === 'fulfilled' && rolesResult.value.ok) {
         const rolesData = await rolesResult.value.json();
-        console.log('Roles data:', JSON.stringify(rolesData)?.substring(0, 500));
-        if (Array.isArray(rolesData)) {
-          setRoles(rolesData);
-        } else if (rolesData?.content) {
-          setRoles(rolesData.content);
-        } else if (rolesData?.data) {
-          setRoles(rolesData.data);
-        }
+        const roles = normalizeList(rolesData, normalizeRole);
+        console.log('Roles parsed:', roles.length, roles);
+        setRoles(roles);
       }
       
       setCanUpload(true);
@@ -410,14 +420,23 @@ export default function DocumentsScreen() {
       if (uploadCategory) {
         formData.append('categoryId', uploadCategory);
       }
+      // Send tagIds as separate parameters for each tag
       if (uploadTags.length > 0) {
-        formData.append('tagIds', JSON.stringify(uploadTags));
+        uploadTags.forEach(tagId => {
+          formData.append('tagIds', tagId);
+        });
       }
+      // Send accessibleDepartments as separate parameters for each department (Spring @RequestParam List parsing)
       if (uploadDepartments.length > 0) {
-        formData.append('accessibleDepartments', JSON.stringify(uploadDepartments));
+        uploadDepartments.forEach(deptId => {
+          formData.append('accessibleDepartments', deptId.toString());
+        });
       }
+      // Send accessibleRoles as separate parameters for each role
       if (uploadRoles.length > 0) {
-        formData.append('accessibleRoles', JSON.stringify(uploadRoles));
+        uploadRoles.forEach(roleId => {
+          formData.append('accessibleRoles', roleId.toString());
+        });
       }
       if (uploadMinRoleLevel > 1) {
         formData.append('minimumRoleLevel', uploadMinRoleLevel.toString());
@@ -561,6 +580,48 @@ export default function DocumentsScreen() {
     } catch (e) {
       setSelectedDoc(doc);
       setShowDetailModal(true);
+    }
+  }
+
+  async function handlePreviewText(doc: Document) {
+    setPreviewLoading(true);
+    setShowPreviewModal(true);
+    try {
+      const token = await getAccessToken();
+      const res = await apiRequest(`${KNOWLEDGE_BASE}/documents/${doc.id}/preview`);
+      if (res.ok) {
+        const data = await res.json();
+        setPreviewContent(data.content || data.text || 'Không có nội dung để hiển thị');
+      } else if (res.status === 422) {
+        setPreviewContent(isVi 
+          ? 'Không trích được văn bản để xem trước (ví dụ: PDF scan). Vui lòng tải file gốc.' 
+          : 'Cannot extract text for preview (e.g. scanned PDF). Please download the original file.');
+      } else {
+        setPreviewContent(isVi ? 'Không thể tải nội dung xem trước' : 'Cannot load preview content');
+      }
+    } catch (e) {
+      setPreviewContent(isVi ? 'Lỗi khi tải nội dung' : 'Error loading content');
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  function isTextFile(filename?: string): boolean {
+    if (!filename) return false;
+    const ext = filename.split('.').pop()?.toLowerCase();
+    return ['txt', 'md', 'json', 'xml', 'csv', 'log'].includes(ext || '');
+  }
+
+  async function handlePreviewFromUri(uri: string) {
+    try {
+      setPreviewLoading(true);
+      setShowPreviewModal(true);
+      const content = await FileSystem.readAsStringAsync(uri);
+      setPreviewContent(content);
+    } catch (e) {
+      setPreviewContent(isVi ? 'Không thể đọc file' : 'Cannot read file');
+    } finally {
+      setPreviewLoading(false);
     }
   }
 
@@ -737,7 +798,21 @@ export default function DocumentsScreen() {
             
             <TouchableOpacity
               style={styles.fab}
-              onPress={() => setShowUploadModal(true)}
+              onPress={() => {
+                // Reset form
+                setUploadTitle('');
+                setUploadDescription('');
+                setUploadFile(null);
+                setUploadCategory('');
+                setUploadTags([]);
+                setUploadDepartments([]);
+                setUploadRoles([]);
+                setUploadMinRoleLevel(1);
+                setUploadVisibility('COMPANY_WIDE');
+                // Load fresh metadata
+                loadMetadata();
+                setShowUploadModal(true);
+              }}
             >
               <Ionicons name="add" size={28} color="#fff" />
             </TouchableOpacity>
@@ -1107,35 +1182,74 @@ export default function DocumentsScreen() {
                 </View>
               ) : (
                 downloadHistory.map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.historyModalItem}
-                    onPress={() => {
-                      // Set file vào upload form
-                      setUploadFile({
-                        uri: item.uri,
-                        name: item.filename,
-                        type: getMimeType(item.filename),
-                        size: 0,
-                      });
-                      setShowHistoryModal(false);
-                      setShowUploadModal(true);
-                    }}
-                  >
-                    <View style={styles.historyModalItemIcon}>
-                      <Ionicons name="document-text" size={20} color="#3b82f6" />
-                    </View>
-                    <View style={styles.historyModalItemInfo}>
-                      <Text style={styles.historyModalItemName} numberOfLines={1}>
-                        {item.filename}
-                      </Text>
-                      <Text style={styles.historyModalItemTime}>
-                        {new Date(item.downloadedAt).toLocaleString(isVi ? 'vi-VN' : 'en-US')}
-                      </Text>
-                    </View>
-                    <Ionicons name="arrow-forward" size={20} color="#9ca3af" />
-                  </TouchableOpacity>
+                  <View key={item.id} style={styles.historyItemContainer}>
+                    <TouchableOpacity
+                      style={styles.historyModalItem}
+                      onPress={() => {
+                        // Xem trực tiếp file text
+                        if (isTextFile(item.filename)) {
+                          handlePreviewFromUri(item.uri);
+                        } else {
+                          // Tải lại file để xem (share)
+                          handleDownload({ id: item.id, originalFileName: item.filename });
+                        }
+                      }}
+                    >
+                      <View style={styles.historyModalItemIcon}>
+                        <Ionicons 
+                          name={isTextFile(item.filename) ? "document-text" : "download-outline"} 
+                          size={20} 
+                          color={isTextFile(item.filename) ? "#10b981" : "#6b7280"} 
+                        />
+                      </View>
+                      <View style={styles.historyModalItemInfo}>
+                        <Text style={styles.historyModalItemName} numberOfLines={1}>
+                          {item.filename}
+                        </Text>
+                        <Text style={styles.historyModalItemTime}>
+                          {new Date(item.downloadedAt).toLocaleString(isVi ? 'vi-VN' : 'en-US')}
+                        </Text>
+                      </View>
+                      {isTextFile(item.filename) && (
+                        <View style={styles.eyeIcon}>
+                          <Ionicons name="eye" size={18} color="#10b981" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 ))
+              )}
+            </ScrollView>
+          </View>
+        </Modal>
+
+        {/* Preview Modal */}
+        <Modal
+          visible={showPreviewModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowPreviewModal(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {isVi ? 'Nội dung file' : 'File Content'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowPreviewModal(false)}>
+                <Ionicons name="close" size={24} color="#374151" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.previewContent}>
+              {previewLoading ? (
+                <View style={styles.centerContainer}>
+                  <ActivityIndicator size="large" color="#10b981" />
+                  <Text style={styles.loadingText}>
+                    {isVi ? 'Đang tải...' : 'Loading...'}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.previewText}>{previewContent}</Text>
               )}
             </ScrollView>
           </View>
@@ -1617,15 +1731,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  historyModalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
+  historyItemContainer: {
     backgroundColor: '#f9fafb',
     borderRadius: 10,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    overflow: 'hidden',
+  },
+  historyModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
   },
   historyModalItemIcon: {
     width: 40,
@@ -1648,6 +1765,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     marginTop: 2,
+  },
+  eyeIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#10b98120',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewContent: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#f9fafb',
+  },
+  previewText: {
+    fontSize: 14,
+    color: '#374151',
+    fontFamily: 'monospace',
+    lineHeight: 20,
   },
   // Tags styles
   tagsContainer: {
