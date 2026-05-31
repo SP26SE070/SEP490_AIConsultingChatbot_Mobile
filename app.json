@@ -38,7 +38,11 @@
     "extra": {
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "e1d71d24-42d1-493e-8049-ad00f885500e"
       }
-    }
+    },
+    "owner": "dt.2401"
   }
 }

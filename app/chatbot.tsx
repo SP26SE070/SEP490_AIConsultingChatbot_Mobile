@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import { sendMessage, getConversationHistory, rateMessage } from '../lib/api/chatbot';
+import { isRatingMessageId, resolveServerMessageId } from '../lib/chatMessageId';
 import { getPendingConversation, consumeNewChatRequest } from '../lib/navigation-store';
 import { useNotification } from '../lib/notification';
 import { saveChatSession, loadChatSession, clearChatSession } from '../lib/chat-session-store';
@@ -37,10 +38,117 @@ interface Message {
 
 interface ChatSourceDocument {
   documentId: string;
-  documentTitle: string;
+  documentTitle?: string;
+  fileName?: string;
   chunkIndex: number;
-  similarityScore: number;
-  snippet: string;
+  similarityScore?: number;
+  relevanceScore?: number;
+  snippet?: string;
+  chunkContent?: string;
+}
+
+function getSourceTitle(source: ChatSourceDocument) {
+  return source.documentTitle || source.fileName || source.documentId || 'Tài liệu';
+}
+
+function getSourceSnippet(source: ChatSourceDocument) {
+  return source.snippet || source.chunkContent || '';
+}
+
+function getSourceScore(source: ChatSourceDocument) {
+  return source.relevanceScore ?? source.similarityScore ?? 0;
+}
+
+function getSourceKey(source: ChatSourceDocument) {
+  const id = source.documentId?.trim();
+  if (id) return id.toLowerCase();
+  return getSourceTitle(source).trim().toLowerCase();
+}
+
+function deduplicateSources(sources: ChatSourceDocument[]): ChatSourceDocument[] {
+  const grouped = new Map<string, ChatSourceDocument>();
+  for (const source of sources) {
+    const key = getSourceKey(source);
+    const existing = grouped.get(key);
+    if (!existing || getSourceScore(source) > getSourceScore(existing)) {
+      grouped.set(key, source);
+    }
+  }
+  return [...grouped.values()].sort((a, b) => getSourceScore(b) - getSourceScore(a));
+}
+
+function mapApiSources(rawSources: unknown): ChatSourceDocument[] | undefined {
+  if (!Array.isArray(rawSources) || rawSources.length === 0) return undefined;
+  const mapped = rawSources.flatMap((source: any) => {
+    if (!source || typeof source !== 'object') return [];
+    return [{
+      documentId: source.documentId || source.document_id || '',
+      documentTitle: source.documentTitle || source.fileName || source.file_name,
+      fileName: source.fileName || source.file_name,
+      chunkIndex: source.chunkIndex ?? source.chunk_index ?? 0,
+      similarityScore: source.similarityScore ?? source.relevanceScore,
+      relevanceScore: source.relevanceScore ?? source.similarityScore,
+      snippet: source.snippet || source.chunkContent || source.chunk_content,
+      chunkContent: source.chunkContent || source.chunk_content,
+    }];
+  });
+  const deduped = deduplicateSources(mapped);
+  return deduped.length > 0 ? deduped : undefined;
+}
+
+function extractInlineSources(answer: string): ChatSourceDocument[] | undefined {
+  const matches = [...answer.matchAll(/Nguồn:\s*([^\n]+)/gi)];
+  if (matches.length === 0) return undefined;
+  const sources = matches.map((match, index) => {
+    const title = match[1].trim();
+    return {
+      documentId: title,
+      documentTitle: title,
+      fileName: title,
+      chunkIndex: index,
+      snippet: '',
+    };
+  });
+  return deduplicateSources(sources);
+}
+
+function resolveMessageSources(result: any, answer: string): ChatSourceDocument[] | undefined {
+  return mapApiSources(result?.sources)
+    ?? mapApiSources(result?.sourceChunks)
+    ?? extractInlineSources(answer);
+}
+
+async function resolveAssistantMessageId(
+  result: any,
+  convId: string | undefined
+): Promise<string | undefined> {
+  const fromResponse = resolveServerMessageId({
+    messageId: result?.messageId,
+    message_id: result?.message_id,
+    id: result?.messageId,
+  });
+  if (fromResponse && isRatingMessageId(fromResponse)) return fromResponse;
+
+  if (!convId) return undefined;
+
+  try {
+    const history = await getConversationHistory(convId);
+    const lastAssistant = [...(history.messages || [])]
+      .reverse()
+      .find((msg: any) => msg.role === 'ASSISTANT');
+    const historyId = resolveServerMessageId(lastAssistant);
+    if (historyId && isRatingMessageId(historyId)) return historyId;
+  } catch {
+    // ignore
+  }
+
+  return undefined;
+}
+
+function stripInlineSource(text: string) {
+  return text
+    .replace(/\n?Nguồn:\s*[^\n]+(?:\n?)/gi, '')
+    .trim();
 }
 
 export default function ChatbotScreen() {
@@ -146,10 +254,13 @@ export default function ChatbotScreen() {
       setHistoryLoading(true);
       const data = await getConversationHistory(convId);
       if (data.messages && Array.isArray(data.messages)) {
-        const loadedMessages: Message[] = data.messages.map((msg: any) => ({
-          id: msg.id || msg.messageId || Date.now().toString(),
+        const loadedMessages: Message[] = data.messages.map((msg: any, index: number) => ({
+          id: resolveServerMessageId(msg) || `history-${index}`,
           role: msg.role === 'USER' ? 'user' : 'assistant',
           content: msg.content,
+          sources: resolveMessageSources(msg, msg.content),
+          rating: msg.rating === 5 ? 'helpful' : msg.rating === 1 ? 'not-helpful' : null,
+          responseTimeMs: msg.responseTimeMs,
         }));
         setMessages(loadedMessages);
         setConversationId(convId);
@@ -180,13 +291,13 @@ export default function ChatbotScreen() {
       content,
     };
 
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: '',
-    };
+    const assistantPlaceholderId = `pending-${Date.now()}`;
 
-    setMessages(prev => [...prev, userMessage, assistantMessage]);
+    setMessages(prev => [
+      ...prev,
+      userMessage,
+      { id: assistantPlaceholderId, role: 'assistant', content: '' },
+    ]);
     setInput('');
     setSending(true);
 
@@ -196,17 +307,23 @@ export default function ChatbotScreen() {
 
     try {
       const result = await sendMessage({ message: content, conversationId, tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined });
+      const convId = result.conversationId || conversationId;
       if (result.conversationId && !conversationId) {
         setConversationId(result.conversationId);
       }
+      const answer = result.answer || '';
+      const realMessageId = await resolveAssistantMessageId(result, convId);
+
       setMessages(prev =>
         prev.map(msg =>
-          msg.id === assistantMessage.id
+          msg.id === assistantPlaceholderId
             ? {
-                ...msg,
-                content: result.answer,
-                sources: result.sources,
+                id: realMessageId || assistantPlaceholderId,
+                role: 'assistant',
+                content: stripInlineSource(answer),
+                sources: resolveMessageSources(result, answer),
                 responseTimeMs: result.responseTimeMs,
+                rating: null,
               }
             : msg
         )
@@ -214,7 +331,7 @@ export default function ChatbotScreen() {
     } catch (e: any) {
       setMessages(prev =>
         prev.map(msg =>
-          msg.id === assistantMessage.id
+          msg.id === assistantPlaceholderId
             ? { ...msg, content: t.error + ': ' + (e.message || 'Unknown error') }
             : msg
         )
@@ -244,6 +361,7 @@ export default function ChatbotScreen() {
   }
 
   async function handleRate(messageId: string, rating: 'helpful' | 'not-helpful') {
+    if (!isRatingMessageId(messageId)) return;
     setMessages(prev =>
       prev.map(msg =>
         msg.id === messageId ? { ...msg, rating } : msg
@@ -356,16 +474,16 @@ export default function ChatbotScreen() {
                           <Ionicons name="library-outline" size={12} color="#64748b" />
                           <Text style={styles.sourcesTitle}> {t.sources}</Text>
                         </View>
-                        {item.sources.slice(0, 3).map((source, idx) => (
-                          <View key={idx} style={styles.sourceItem}>
+                        {deduplicateSources(item.sources).slice(0, 3).map((source) => (
+                          <View key={getSourceKey(source)} style={styles.sourceItem}>
                             <View style={styles.sourceTitleRow}>
                               <Ionicons name="document-text-outline" size={12} color="#10b981" />
                               <Text style={styles.sourceTitle} numberOfLines={1}>
-                                {source.documentTitle}
+                                {getSourceTitle(source)}
                               </Text>
                             </View>
                             <Text style={styles.sourceSnippet} numberOfLines={2}>
-                              {source.snippet}
+                              {getSourceSnippet(source)}
                             </Text>
                           </View>
                         ))}
@@ -383,34 +501,34 @@ export default function ChatbotScreen() {
                     )}
 
                     {/* Rating */}
-                    {item.role === 'assistant' && item.id && (
+                    {item.role === 'assistant' && isRatingMessageId(item.id) && (
                       <View style={styles.ratingRow}>
-                        {item.rating === null ? (
+                        {item.rating == null ? (
                           <>
                             <TouchableOpacity
-                              style={styles.rateBtn}
+                              style={[styles.rateBtn, styles.rateBtnNeutral]}
                               onPress={() => handleRate(item.id, 'helpful')}
                             >
-                              <Ionicons name="thumbs-up-outline" size={14} color="#10b981" />
-                              <Text style={styles.rateBtnText}>{t.helpful}</Text>
+                              <Ionicons name="thumbs-up-outline" size={14} color="#94a3b8" />
+                              <Text style={styles.rateBtnTextNeutral}>{t.helpful}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                              style={styles.rateBtn}
+                              style={[styles.rateBtn, styles.rateBtnNeutral]}
                               onPress={() => handleRate(item.id, 'not-helpful')}
                             >
-                              <Ionicons name="thumbs-down-outline" size={14} color="#64748b" />
-                              <Text style={styles.rateBtnTextMuted}>{t.notHelpful}</Text>
+                              <Ionicons name="thumbs-down-outline" size={14} color="#94a3b8" />
+                              <Text style={styles.rateBtnTextNeutral}>{t.notHelpful}</Text>
                             </TouchableOpacity>
                           </>
                         ) : (
                           <View style={styles.ratedBadge}>
                             <Ionicons 
-                              name={item.rating === 'helpful' ? "checkmark-circle" : "chatbox-ellipses"} 
+                              name={item.rating === 'helpful' ? "thumbs-up" : "thumbs-down"} 
                               size={14} 
                               color="#10b981" 
                             />
                             <Text style={styles.ratedText}>
-                              {item.rating === 'helpful' ? t.thanks : t.feedbackReceived}
+                              {item.rating === 'helpful' ? t.helpful : t.notHelpful}
                             </Text>
                           </View>
                         )}
@@ -880,9 +998,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#334155',
   },
+  rateBtnNeutral: {
+    backgroundColor: '#162033',
+    borderColor: '#2b3a4d',
+  },
   rateBtnText: {
     fontSize: 12,
     color: '#10b981',
+    fontWeight: '500',
+  },
+  rateBtnTextNeutral: {
+    fontSize: 12,
+    color: '#94a3b8',
     fontWeight: '500',
   },
   rateBtnTextMuted: {

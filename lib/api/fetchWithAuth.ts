@@ -7,6 +7,12 @@ export async function fetchWithAuth(
 ): Promise<Response> {
   const token = await getAccessToken();
 
+  // Debug: log whether token exists and target URL
+  try {
+    // eslint-disable-next-line no-console
+    console.debug('[fetchWithAuth] url=', url, 'hasToken=', !!token);
+  } catch {}
+
   const headers = {
     ...options.headers,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -19,6 +25,10 @@ export async function fetchWithAuth(
     const cloned = res.clone();
     try {
       const data = await cloned.json();
+      try {
+        // eslint-disable-next-line no-console
+        console.debug('[fetchWithAuth] 401 response for', url, 'body=', data);
+      } catch {}
       if (
         data?.error?.includes('Session expired') ||
         data?.message?.includes('Session expired')

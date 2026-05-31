@@ -8,7 +8,8 @@
     "android:offline": "expo start --android --localhost --offline --clear",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "proxy": "node proxy-server.js"
+    "build:android:apk": "npx eas-cli build -p android --profile preview",
+    "build:android:apk:prod": "npx eas-cli build -p android --profile production"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.0",

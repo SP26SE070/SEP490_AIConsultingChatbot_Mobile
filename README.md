@@ -32,10 +32,39 @@ Built with Expo + TypeScript.
 
 ## Backend URL
 
+Production APK uses:
+
 https://sp26se070internalchatbotbe-production.up.railway.app
 
-## Test Accounts
+Local dev still uses `localhost` / `10.0.2.2:8080`.
 
+## Build APK (EAS) — tài khoản Expo của bạn
+
+1. Tạo tài khoản miễn phí tại [expo.dev](https://expo.dev) (nếu chưa có).
+
+2. Login:
+   ```
+   npx eas-cli login
+   ```
+
+3. Liên kết project với tài khoản của bạn (chỉ lần đầu):
+   ```
+   npx eas-cli init
+   ```
+   Chọn **Create a new project** — Expo sẽ tạo project riêng dưới account của bạn.
+
+4. Build APK:
+   ```
+   npm run build:android:apk
+   ```
+
+5. Khi build xong, mở [expo.dev](https://expo.dev) → **Projects** → project của bạn → **Builds** → **Download** APK.
+
+Profile `preview` / `production` trong `eas.json` đã cấu hình:
+- `buildType: apk`
+- `EXPO_PUBLIC_API_BASE_URL` trỏ Railway BE
+
+## Test Accounts
 | Role         | Email             | Password |
 | ------------ | ----------------- | -------- |
 | Tenant Admin | admin@fpt.com     | 123456   |

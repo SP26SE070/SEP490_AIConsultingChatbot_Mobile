@@ -102,7 +102,7 @@ export default function DocumentsScreen() {
   const t = translations[language];
   const isVi = language === 'vi';
   const { showToast, showConfirm, showSuccess, showError, showInfo } = useNotification();
-  const API_BASE = 'http://10.0.2.2:8080/api/v1';
+  const API_BASE = `${API_BASE_URL}/api/v1`;
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('documents');
@@ -157,7 +157,12 @@ export default function DocumentsScreen() {
   // ========== LOAD DATA ==========
   async function loadDocuments() {
     try {
-      const res = await apiRequest(`${API_BASE}/knowledge/documents`);
+        const token = await getAccessToken();
+        try {
+          // eslint-disable-next-line no-console
+          console.debug('[Documents] loading docs, url=', `${API_BASE}/knowledge/documents`, 'tokenExists=', !!token);
+        } catch {}
+        const res = await apiRequest(`${API_BASE}/knowledge/documents`);
       if (res.ok) {
         const data = await res.json();
         const docs = data.content || data.data || data || [];

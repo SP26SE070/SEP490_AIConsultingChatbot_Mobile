@@ -1,13 +1,15 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity,
-  StyleSheet, ActivityIndicator, RefreshControl, ScrollView, Image
+  StyleSheet, ActivityIndicator, RefreshControl, ScrollView, Image, Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { AppShell } from '../../components/layout/AppShell';
 import { useLanguageStore, translations } from '../../lib/language-store';
 import { getAccessToken } from '../../lib/auth-store';
+import { API_BASE_URL } from '../../lib/api/config';
+import { getPaymentHistory, type PaymentHistoryItem, type PaymentStatus } from '../../lib/api/payment';
 import { useNotification } from '../../lib/notification';
 
 interface Subscription {
@@ -51,60 +53,58 @@ interface PaymentInfo {
   bank_account?: string;
   bank_name?: string;
   account_name?: string;
+  polling_interval_seconds?: number;
 }
 
 interface Plan {
   id: string;
+  code: string;
   name: string;
-  price: number;
+  description?: string;
   period: string;
   features: string[];
   recommended?: boolean;
   tier: string;
+  monthlyPrice?: number;
+  quarterlyPrice?: number;
+  yearlyPrice?: number;
+  displayOrder?: number;
+  isActive?: boolean;
 }
 
-const PLANS: Plan[] = [
-  {
-    id: 'starter',
-    tier: 'STARTER',
-    name: 'Starter',
-    price: 299000,
-    period: 'tháng',
-    features: [
-      '100 lượt chat/tháng',
-      'Tài liệu cơ bản',
-      'Độ chính xác 85-90%',
-      'Hỗ trợ email',
-    ],
-  },
-  {
-    id: 'standard',
-    tier: 'STANDARD',
-    name: 'Standard',
-    price: 999000,
-    period: 'tháng',
-    features: [
-      '1,000 lượt chat/tháng',
-      'Tài liệu mở rộng',
-      'Độ chính xác 90-95%',
-      'Hỗ trợ ưu tiên & xuất báo cáo',
-    ],
-    recommended: true,
-  },
-  {
-    id: 'enterprise',
-    tier: 'ENTERPRISE',
-    name: 'Enterprise',
-    price: 2999000,
-    period: 'tháng',
-    features: [
-      'Chat không giới hạn',
-      'Toàn bộ tài liệu',
-      'Độ chính xác 95-98%',
-      'Hỗ trợ 24/7, tùy chỉnh AI & API',
-    ],
-  },
+type BillingCycle = 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+
+const BILLING_CYCLES: Array<{ value: BillingCycle; labelVi: string; labelEn: string }> = [
+  { value: 'MONTHLY', labelVi: 'Theo tháng', labelEn: 'Monthly' },
+  { value: 'QUARTERLY', labelVi: 'Theo quý', labelEn: 'Quarterly' },
+  { value: 'YEARLY', labelVi: 'Theo năm', labelEn: 'Yearly' },
 ];
+
+const DEFAULT_FEATURES_BY_CODE: Record<string, string[]> = {
+  TRIAL: ['Dùng thử miễn phí', 'Giới hạn trong thời gian trial'],
+  STARTER: ['100 lượt chat/tháng', 'Tài liệu cơ bản', 'Độ chính xác 85-90%', 'Hỗ trợ email'],
+  STANDARD: ['1,000 lượt chat/tháng', 'Tài liệu mở rộng', 'Độ chính xác 90-95%', 'Hỗ trợ ưu tiên & xuất báo cáo'],
+  ENTERPRISE: ['Chat không giới hạn', 'Toàn bộ tài liệu', 'Độ chính xác 95-98%', 'Hỗ trợ 24/7, tùy chỉnh AI & API'],
+};
+
+const DEFAULT_DESCRIPTIONS: Record<string, { vi: string; en: string }> = {
+  TRIAL: { 
+    vi: 'Thử nghiệm toàn bộ tính năng của nền tảng',
+    en: 'Test all platform features'
+  },
+  STARTER: { 
+    vi: 'Phù hợp cho doanh nghiệp nhỏ và startup',
+    en: 'Perfect for small businesses and startups'
+  },
+  STANDARD: { 
+    vi: 'Lý tưởng cho doanh nghiệp vừa và nhu cầu cao',
+    en: 'Ideal for medium-sized businesses'
+  },
+  ENTERPRISE: { 
+    vi: 'Giải pháp toàn diện cho doanh nghiệp lớn',
+    en: 'Comprehensive solution for enterprises'
+  },
+};
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: string; labelVi: string; labelEn: string }> = {
   ACTIVE: { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.12)', icon: 'checkmark-circle', labelVi: 'Hoạt động', labelEn: 'Active' },
@@ -127,20 +127,34 @@ const TIER_NAMES_EN: Record<string, string> = {
   TRIAL: 'Trial',
 };
 
+const POPULAR_PLAN_CODE = 'STANDARD';
+
+function isPopularPlan(plan: Pick<Plan, 'code' | 'tier' | 'id'>) {
+  const code = (plan.code || plan.tier || plan.id || '').toString().toUpperCase();
+  return code === POPULAR_PLAN_CODE;
+}
+
 export default function AdminSubscriptionScreen() {
   const { language } = useLanguageStore();
   const t = translations[language];
-  const { showToast, showSuccess, showError, showInfo } = useNotification();
+  const { showToast, showSuccess, showError, showInfo, showConfirm } = useNotification();
 
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<'plans' | 'current' | 'payment'>('current');
+  const [selectedTab, setSelectedTab] = useState<'plans' | 'current' | 'payment' | 'history'>('current');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [selectedCycle, setSelectedCycle] = useState<BillingCycle>('MONTHLY');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
-  const API_BASE = 'http://10.0.2.2:8080/api/v1';
+  const API_BASE = `${API_BASE_URL}/api/v1`;
 
   function getTierName(tier?: string): string {
     if (!tier) return '-';
@@ -175,6 +189,65 @@ export default function AdminSubscriptionScreen() {
     }
   }
 
+  function mapPlanResponse(plan: any): Plan {
+    const code = (plan.code || plan.tier || plan.name || 'PLAN').toString().toUpperCase();
+    let features: string[] = [];
+    
+    if (typeof plan.features === 'string') {
+      // Split by newline, then by comma+space to separate individual features
+      features = plan.features
+        .split(/\r?\n/)
+        .flatMap((line: string) => line.split(/,\s+/)) // Split by ", " to preserve "2,000"
+        .map((item: string) => item.trim())
+        .filter((item: string) => item.length > 0);
+    } else if (Array.isArray(plan.features)) {
+      features = plan.features;
+    }
+
+    // Clean features: remove ALL checkmarks, bullets, and special symbols
+    const cleanedFeatures = features
+      .map((f: string) => {
+        // Remove checkmarks, bullets, dashes and other symbols from anywhere in the string
+        return f
+          .replace(/[✅✔☑✓◻️⬜▪•◆★✐✑✒✕✖✗✘✙✚✛✜✝✞✟]/g, ' ')
+          .replace(/^[\s\-*•·]+/, '')
+          .replace(/[\s\-*•·]+$/, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+      })
+      .filter(f => f.length > 0);
+
+    const descriptionData = DEFAULT_DESCRIPTIONS[code];
+    const description = language === 'vi' ? descriptionData?.vi : descriptionData?.en;
+
+    return {
+      id: code.toLowerCase(),
+      code,
+      tier: code,
+      name: plan.name || code,
+      description,
+      period: language === 'vi' ? 'tháng' : 'month',
+      features: cleanedFeatures.length > 0 ? cleanedFeatures : (DEFAULT_FEATURES_BY_CODE[code] || []),
+      recommended: code === POPULAR_PLAN_CODE,
+      monthlyPrice: Number(plan.monthlyPrice || 0),
+      quarterlyPrice: Number(plan.quarterlyPrice || 0),
+      yearlyPrice: Number(plan.yearlyPrice || 0),
+      displayOrder: plan.displayOrder,
+      isActive: plan.isActive,
+    };
+  }
+
+  function getSelectedPlan() {
+    return availablePlans.find(plan => plan.id === selectedPlanId) || null;
+  }
+
+  function getPlanPrice(plan: Plan | null | undefined, cycle: BillingCycle) {
+    if (!plan) return 0;
+    if (cycle === 'QUARTERLY') return plan.quarterlyPrice || plan.monthlyPrice || 0;
+    if (cycle === 'YEARLY') return plan.yearlyPrice || plan.monthlyPrice || 0;
+    return plan.monthlyPrice || 0;
+  }
+
   async function fetchSubscription() {
     try {
       const token = await getAccessToken();
@@ -195,15 +268,149 @@ export default function AdminSubscriptionScreen() {
     }
   }
 
+  async function fetchPaymentHistory() {
+    try {
+      setHistoryLoading(true);
+      const data = await getPaymentHistory();
+      setPaymentHistory(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.warn('Failed to fetch payment history:', e);
+      setPaymentHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function fetchAvailablePlans() {
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${API_BASE}/subscriptions/plans`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to fetch plans');
+      const data = await res.json();
+      const plans = (Array.isArray(data) ? data : []).map(mapPlanResponse).filter((plan: Plan) => plan.isActive !== false);
+      setAvailablePlans(plans);
+    } catch (e) {
+      console.warn('Failed to fetch available plans:', e);
+      setAvailablePlans([]);
+    }
+  }
+
   useFocusEffect(
     useCallback(() => {
       fetchSubscription();
+      fetchAvailablePlans();
+      fetchPaymentHistory();
     }, [])
   );
+
+  useEffect(() => {
+    if (selectedTab === 'history') {
+      fetchPaymentHistory();
+    }
+  }, [selectedTab]);
+
+  useEffect(() => {
+    const paymentId = paymentInfo?.payment_id;
+    if (!paymentId) {
+      setPaymentStatus(null);
+      return;
+    }
+
+    let cancelled = false;
+    const intervalMs = (paymentInfo.polling_interval_seconds ?? 5) * 1000;
+
+    async function checkPaymentStatus() {
+      try {
+        const token = await getAccessToken();
+        const res = await fetch(`${API_BASE}/payment/status/${paymentId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) return;
+
+        const data = await res.json();
+        setPaymentStatus(data.status);
+
+        if (data.status === 'SUCCESS') {
+          setPaymentInfo(null);
+          setPaymentStatus(null);
+          setSelectedTab('current');
+
+          const subRes = await fetch(`${API_BASE}/tenant-subscription/my-subscription`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (subRes.ok && !cancelled) {
+            setSubscription(await subRes.json());
+            setShowPaymentSuccessModal(true);
+            fetchPaymentHistory();
+          }
+        } else if (data.status === 'FAILED' || data.status === 'EXPIRED' || data.status === 'CANCELLED') {
+          showError(
+            language === 'vi'
+              ? 'Thanh toán không thành công hoặc đã hết hạn. Vui lòng thử lại.'
+              : 'Payment failed or expired. Please try again.',
+            language === 'vi' ? 'Lỗi thanh toán' : 'Payment Error'
+          );
+        }
+      } catch {
+        // keep polling
+      }
+    }
+
+    checkPaymentStatus();
+    const interval = setInterval(checkPaymentStatus, intervalMs);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [paymentInfo?.payment_id, paymentInfo?.polling_interval_seconds, language, showError]);
 
   function onRefresh() {
     setRefreshing(true);
     fetchSubscription();
+    fetchAvailablePlans();
+    fetchPaymentHistory();
+  }
+
+  function getPaymentStatusInfo(status?: PaymentStatus | string) {
+    switch (status) {
+      case 'SUCCESS':
+        return {
+          label: language === 'vi' ? 'Đã thanh toán' : 'Paid',
+          color: '#22c55e',
+          bg: 'rgba(34, 197, 94, 0.12)',
+          icon: 'checkmark-circle' as const,
+        };
+      case 'FAILED':
+        return {
+          label: language === 'vi' ? 'Thất bại' : 'Failed',
+          color: '#f87171',
+          bg: 'rgba(248, 113, 113, 0.12)',
+          icon: 'close-circle' as const,
+        };
+      case 'EXPIRED':
+        return {
+          label: language === 'vi' ? 'Hết hạn' : 'Expired',
+          color: '#94a3b8',
+          bg: 'rgba(148, 163, 184, 0.12)',
+          icon: 'time' as const,
+        };
+      case 'CANCELLED':
+        return {
+          label: language === 'vi' ? 'Đã hủy' : 'Cancelled',
+          color: '#94a3b8',
+          bg: 'rgba(148, 163, 184, 0.12)',
+          icon: 'close-circle' as const,
+        };
+      default:
+        return {
+          label: language === 'vi' ? 'Chờ xử lý' : 'Pending',
+          color: '#f59e0b',
+          bg: 'rgba(245, 158, 11, 0.12)',
+          icon: 'time' as const,
+        };
+    }
   }
 
   function formatPrice(price?: number) {
@@ -233,51 +440,79 @@ export default function AdminSubscriptionScreen() {
     switch (cycle) {
       case 'YEARLY': return language === 'vi' ? 'năm' : 'year';
       case 'QUARTERLY': return language === 'vi' ? 'quý' : 'quarter';
+      case 'MONTHLY': return language === 'vi' ? 'tháng' : 'month';
       default: return language === 'vi' ? 'tháng' : 'month';
     }
   }
 
-  async function handleSelectPlan(planId: string) {
+  function closeConfirmModal() {
+    setShowConfirmModal(false);
+    setSelectedPlanId(null);
+  }
+
+  function openConfirmPlan(planId: string) {
+    const plan = availablePlans.find(item => item.id === planId);
+    if (!plan) {
+      showError(
+        language === 'vi' ? 'Không tìm thấy thông tin gói. Vui lòng thử lại.' : 'Plan not found. Please try again.',
+        language === 'vi' ? 'Lỗi' : 'Error'
+      );
+      return;
+    }
+    setSelectedPlanId(planId);
+    setSelectedCycle('MONTHLY');
+    setPaymentInfo(null);
+    setSelectedTab('plans');
+    setShowConfirmModal(true);
+  }
+
+  async function startPurchase(planId: string) {
+    const plan = availablePlans.find(item => item.id === planId);
+    if (!plan) return;
+
     setSelectedPlanId(planId);
     setProcessing(true);
     try {
       const token = await getAccessToken();
-      const plan = PLANS.find(p => p.id === planId);
-      
       const res = await fetch(`${API_BASE}/subscriptions/select-plan`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          tier: plan?.tier || 'STARTER',
-          cycle: 'MONTHLY'
+        body: JSON.stringify({
+          tier: plan.code || plan.tier || 'STARTER',
+          cycle: selectedCycle,
         }),
       });
-      
+
       const data = await res.json().catch(() => ({}));
-      
+
       if (res.ok) {
         if (data.payment_id) {
           setPaymentInfo(data as PaymentInfo);
           setSelectedTab('payment');
+          setShowConfirmModal(false);
           showInfo(language === 'vi' ? 'Vui lòng hoàn tất thanh toán.' : 'Please complete your payment.', language === 'vi' ? 'Thông tin thanh toán' : 'Payment Information');
         } else {
           showSuccess(language === 'vi' ? 'Đã kích hoạt gói dùng thử!' : 'Trial plan activated!', language === 'vi' ? 'Thành công' : 'Success');
           fetchSubscription();
           setSelectedTab('current');
+          setShowConfirmModal(false);
         }
       } else {
         showError(data?.error || data?.message || (language === 'vi' ? 'Không thể chọn gói.' : 'Cannot select plan.'), language === 'vi' ? 'Lỗi' : 'Error');
-        setSelectedPlanId(null);
       }
     } catch (e) {
       showError(language === 'vi' ? 'Không thể kết nối máy chủ.' : 'Cannot connect to server.', language === 'vi' ? 'Lỗi' : 'Error');
-      setSelectedPlanId(null);
     } finally {
       setProcessing(false);
     }
+  }
+
+  async function handleSelectPlan() {
+    if (!selectedPlanId) return;
+    await startPurchase(selectedPlanId);
   }
 
   async function handleCancelSubscription() {
@@ -349,10 +584,6 @@ export default function AdminSubscriptionScreen() {
     }
   }
 
-  function selectPlan(planId: string) {
-    setSelectedPlanId(planId);
-  }
-
   const tier = subscription?.tier;
   const colors = getPlanColor(tier);
   const statusInfo = getStatusInfo(subscription?.status);
@@ -373,13 +604,13 @@ export default function AdminSubscriptionScreen() {
   return (
     <AppShell title={language === 'vi' ? 'Đăng ký gói' : 'Subscription'}>
       {/* Tabs */}
-      <View style={styles.tabs}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
         <TouchableOpacity
           style={[styles.tab, selectedTab === 'current' && styles.tabActive]}
           onPress={() => setSelectedTab('current')}
         >
           <Text style={[styles.tabText, selectedTab === 'current' && styles.tabTextActive]}>
-            {language === 'vi' ? 'Gói hiện tại' : 'Current Plan'}
+            {language === 'vi' ? 'Gói hiện tại' : 'Current'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -388,6 +619,14 @@ export default function AdminSubscriptionScreen() {
         >
           <Text style={[styles.tabText, selectedTab === 'plans' && styles.tabTextActive]}>
             {language === 'vi' ? 'Các gói' : 'Plans'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, selectedTab === 'history' && styles.tabActive]}
+          onPress={() => setSelectedTab('history')}
+        >
+          <Text style={[styles.tabText, selectedTab === 'history' && styles.tabTextActive]}>
+            {language === 'vi' ? 'Lịch sử GD' : 'History'}
           </Text>
         </TouchableOpacity>
         {paymentInfo && (
@@ -400,7 +639,7 @@ export default function AdminSubscriptionScreen() {
             </Text>
           </TouchableOpacity>
         )}
-      </View>
+      </ScrollView>
 
       {/* Current Plan Tab */}
       {selectedTab === 'current' && (
@@ -575,41 +814,37 @@ export default function AdminSubscriptionScreen() {
       {/* Plans Tab */}
       {selectedTab === 'plans' && (
         <View style={styles.plansContainer}>
-          <Text style={styles.plansSubtitle}>
-            {language === 'vi' 
-              ? 'Chọn gói phù hợp với nhu cầu của bạn'
-              : 'Choose the plan that fits your needs'
-            }
-          </Text>
-
           <ScrollView style={styles.plansScroll} showsVerticalScrollIndicator={false}>
-            {PLANS.map((plan) => {
+            {availablePlans.map((plan) => {
               const planColors = getPlanColor(plan.tier);
               const isCurrent = tier?.toLowerCase() === plan.id;
               const isSelected = selectedPlanId === plan.id;
+              const isPopular = isPopularPlan(plan);
+              const displayPrice = plan.monthlyPrice || 0;
+              const cycleLabel = language === 'vi' ? 'tháng' : 'month';
               
               return (
                 <TouchableOpacity
                   key={plan.id}
                   style={[
                     styles.planCard,
-                    plan.recommended && styles.planCardRecommended,
+                    isPopular && styles.planCardPopular,
                     isCurrent && styles.planCardCurrent,
                     isSelected && styles.planCardSelected,
                   ]}
-                  onPress={() => !isCurrent && selectPlan(plan.id)}
+                  onPress={() => !isCurrent && openConfirmPlan(plan.id)}
                   activeOpacity={0.85}
                 >
-                  {plan.recommended && !isCurrent && (
-                    <View style={[styles.recommendedBadge, { backgroundColor: planColors.primary }]}>
+                  {isPopular && (
+                    <View style={styles.popularBadge}>
                       <Ionicons name="star" size={10} color="#fff" />
-                      <Text style={styles.recommendedBadgeText}>
+                      <Text style={styles.popularBadgeText}>
                         {language === 'vi' ? 'Phổ biến' : 'Popular'}
                       </Text>
                     </View>
                   )}
                   {isCurrent && (
-                    <View style={styles.currentBadge}>
+                    <View style={[styles.currentBadge, isPopular && styles.currentBadgeOnPopular]}>
                       <Ionicons name="checkmark" size={12} color="#fff" />
                       <Text style={styles.currentBadgeText}>
                         {language === 'vi' ? 'Gói hiện tại' : 'Current'}
@@ -623,73 +858,210 @@ export default function AdminSubscriptionScreen() {
                   )}
 
                   <View style={styles.planHeader}>
-                    <View style={[styles.planIcon, { backgroundColor: isSelected ? planColors.bg : 'rgba(100, 116, 139, 0.1)' }]}>
-                      <Ionicons 
-                        name={getPlanIcon(plan.tier) as any} 
-                        size={28} 
-                        color={isSelected ? planColors.primary : '#64748b'} 
-                      />
-                    </View>
-                    <View style={styles.planTitleGroup}>
-                      <Text style={[styles.planName, isSelected && { color: '#f1f5f9' }]}>{plan.name}</Text>
-                      <Text style={[styles.planPrice, isSelected && { color: planColors.primary }]}>
-                        {formatPrice(plan.price)}
-                        <Text style={styles.planPeriod}>/{plan.period}</Text>
+                    <Text style={[styles.planName, isSelected && { color: '#f1f5f9' }]}>{plan.name}</Text>
+                    <View style={styles.planPriceRow}>
+                      <Text style={[styles.planPrice, { color: planColors.primary }]}>
+                        {formatPrice(displayPrice)}
                       </Text>
+                      <Text style={styles.planPeriod}>/{cycleLabel}</Text>
                     </View>
                   </View>
 
-                  <View style={styles.planFeatures}>
+                  {plan.description && (
+                    <Text style={[styles.planDescriptionText, isSelected && styles.planDescriptionTextSelected]}>
+                      {plan.description}
+                    </Text>
+                  )}
+
+                  <View style={styles.planDescription}>
                     {plan.features.map((feature, idx) => (
-                      <View key={idx} style={styles.featureRow}>
-                        <Ionicons name="checkmark-circle" size={16} color={isSelected ? planColors.primary : '#64748b'} />
-                        <Text style={[styles.featureText, isSelected && styles.featureTextSelected]}>{feature}</Text>
+                      <View key={idx} style={styles.planFeatureRow}>
+                        <Text style={[styles.planFeatureBullet, isSelected && styles.planFeatureBulletSelected]}>•</Text>
+                        <Text style={[styles.planFeatureText, isSelected && styles.planFeatureTextSelected]}>{feature}</Text>
                       </View>
                     ))}
                   </View>
 
-                  {isSelected && !isCurrent && (
-                    <View style={[styles.selectAction, { backgroundColor: planColors.primary }]}>
-                      <Text style={styles.selectActionText}>
-                        {language === 'vi' ? 'Đã chọn gói này' : 'Plan selected'}
-                      </Text>
-                    </View>
-                  )}
                 </TouchableOpacity>
               );
             })}
-
-            {/* Confirm Button */}
-            {selectedPlanId && (
-              <View style={styles.confirmSection}>
-                <TouchableOpacity
-                  style={styles.confirmButton}
-                  onPress={() => handleSelectPlan(selectedPlanId)}
-                  disabled={processing}
-                  activeOpacity={0.8}
-                >
-                  {processing ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons name="card" size={20} color="#fff" />
-                      <Text style={styles.confirmButtonText}>
-                        {language === 'vi' ? `Thanh toán gói ${PLANS.find(p => p.id === selectedPlanId)?.name}` : `Pay for ${PLANS.find(p => p.id === selectedPlanId)?.name} Plan`}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-                <Text style={styles.confirmNote}>
-                  {language === 'vi' 
-                    ? 'Bạn sẽ được chuyển đến trang thanh toán'
-                    : 'You will be redirected to payment page'
-                  }
-                </Text>
-              </View>
-            )}
           </ScrollView>
         </View>
       )}
+
+      {/* Payment History Tab */}
+      {selectedTab === 'history' && (
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentPadding}
+          refreshControl={
+            <RefreshControl refreshing={refreshing || historyLoading} onRefresh={onRefresh} tintColor="#10b981" />
+          }
+        >
+          <View style={styles.historyHeader}>
+            <Text style={styles.historyTitle}>
+              {language === 'vi' ? 'Lịch sử giao dịch' : 'Transaction History'}
+            </Text>
+            <Text style={styles.historySubtitle}>
+              {language === 'vi'
+                ? 'Theo dõi các giao dịch thanh toán gói đăng ký'
+                : 'Track subscription payment transactions'}
+            </Text>
+          </View>
+
+          {historyLoading && paymentHistory.length === 0 ? (
+            <View style={styles.historyLoading}>
+              <ActivityIndicator size="large" color="#10b981" />
+              <Text style={styles.loadingText}>{t.loading}</Text>
+            </View>
+          ) : paymentHistory.length === 0 ? (
+            <View style={styles.historyEmpty}>
+              <Ionicons name="receipt-outline" size={48} color="#64748b" />
+              <Text style={styles.historyEmptyTitle}>
+                {language === 'vi' ? 'Chưa có giao dịch' : 'No transactions yet'}
+              </Text>
+              <Text style={styles.historyEmptyText}>
+                {language === 'vi'
+                  ? 'Lịch sử sẽ hiện sau khi bạn thanh toán gói đăng ký.'
+                  : 'History will appear after you make a subscription payment.'}
+              </Text>
+            </View>
+          ) : (
+            paymentHistory.map((item) => {
+              const statusInfo = getPaymentStatusInfo(item.status);
+              const tierColors = getPlanColor(item.tier);
+              return (
+                <View key={item.payment_id} style={styles.historyCard}>
+                  <View style={styles.historyCardHeader}>
+                    <View style={[styles.historyTierBadge, { backgroundColor: tierColors.bg }]}>
+                      <Text style={[styles.historyTierText, { color: tierColors.primary }]}>
+                        {getTierName(item.tier)}
+                      </Text>
+                    </View>
+                    <View style={[styles.historyStatusBadge, { backgroundColor: statusInfo.bg }]}>
+                      <Ionicons name={statusInfo.icon} size={12} color={statusInfo.color} />
+                      <Text style={[styles.historyStatusText, { color: statusInfo.color }]}>
+                        {statusInfo.label}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.historyAmount}>
+                    {typeof item.amount === 'number'
+                      ? formatPrice(item.amount)
+                      : '-'}
+                  </Text>
+
+                  <View style={styles.historyRow}>
+                    <Text style={styles.historyLabel}>
+                      {language === 'vi' ? 'Mã giao dịch' : 'Transaction code'}
+                    </Text>
+                    <Text style={styles.historyValue} numberOfLines={2}>
+                      {item.transaction_code}
+                    </Text>
+                  </View>
+
+                  <View style={styles.historyRow}>
+                    <Text style={styles.historyLabel}>
+                      {language === 'vi' ? 'Ngày tạo' : 'Created'}
+                    </Text>
+                    <Text style={styles.historyValue}>{formatDate(item.created_at)}</Text>
+                  </View>
+
+                  {item.paid_at && (
+                    <View style={styles.historyRow}>
+                      <Text style={styles.historyLabel}>
+                        {language === 'vi' ? 'Ngày thanh toán' : 'Paid at'}
+                      </Text>
+                      <Text style={styles.historyValue}>{formatDate(item.paid_at)}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+      )}
+
+      <Modal
+        visible={showConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={closeConfirmModal}
+      >
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmModal}>
+            <Text style={styles.confirmModalTitle}>
+              {language === 'vi' ? 'Xác nhận đăng ký gói' : 'Confirm subscription'}
+            </Text>
+
+            <Text style={styles.confirmModalLabel}>
+              {language === 'vi' ? 'Gói đã chọn' : 'Selected plan'}
+            </Text>
+            <Text style={styles.confirmModalValue}>
+              {getSelectedPlan()?.name || '-'}
+            </Text>
+
+            <Text style={styles.confirmModalLabel}>
+              {language === 'vi' ? 'Chu kỳ thanh toán' : 'Billing cycle'}
+            </Text>
+            <View style={styles.cycleRow}>
+              {BILLING_CYCLES.map(cycle => {
+                const isActive = selectedCycle === cycle.value;
+                return (
+                  <TouchableOpacity
+                    key={cycle.value}
+                    style={[styles.cycleChip, isActive && styles.cycleChipActive]}
+                    onPress={() => setSelectedCycle(cycle.value)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.cycleChipText, isActive && styles.cycleChipTextActive]}>
+                      {language === 'vi' ? cycle.labelVi : cycle.labelEn}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.confirmModalLabel}>
+              {language === 'vi' ? 'Giá tiền' : 'Price'}
+            </Text>
+            <View style={styles.confirmModalPriceRow}>
+              <Text style={styles.confirmModalPrice}>
+                {formatPrice(getPlanPrice(getSelectedPlan(), selectedCycle))}
+              </Text>
+              <Text style={styles.confirmModalCycleLabel}>
+                / {getBillingCycleLabel(selectedCycle)}
+              </Text>
+            </View>
+
+            <View style={styles.confirmModalActions}>
+              <TouchableOpacity
+                style={styles.confirmModalCancel}
+                onPress={closeConfirmModal}
+                disabled={processing}
+              >
+                <Text style={styles.confirmModalCancelText}>
+                  {language === 'vi' ? 'Hủy' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmModalConfirm}
+                onPress={handleSelectPlan}
+                disabled={processing || !getSelectedPlan()}
+              >
+                {processing ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.confirmModalConfirmText}>
+                    {language === 'vi' ? 'Tiếp tục thanh toán' : 'Continue to payment'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Payment Tab */}
       {selectedTab === 'payment' && paymentInfo && (
@@ -766,6 +1138,17 @@ export default function AdminSubscriptionScreen() {
               </View>
             )}
 
+            {(paymentStatus === 'PENDING' || !paymentStatus) && (
+              <View style={styles.pollingStatus}>
+                <ActivityIndicator size="small" color="#f59e0b" />
+                <Text style={styles.pollingStatusText}>
+                  {language === 'vi'
+                    ? 'Đang chờ xác nhận thanh toán...'
+                    : 'Waiting for payment confirmation...'}
+                </Text>
+              </View>
+            )}
+
             <Text style={styles.paymentNote}>
               {language === 'vi' 
                 ? 'Vui lòng chuyển khoản đúng số tiền và nội dung bên trên. Gói sẽ được kích hoạt sau khi thanh toán được xác nhận.'
@@ -775,6 +1158,74 @@ export default function AdminSubscriptionScreen() {
           </View>
         </ScrollView>
       )}
+
+      <Modal
+        visible={showPaymentSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPaymentSuccessModal(false)}
+      >
+        <View style={styles.successOverlay}>
+          <View style={styles.successModal}>
+            <View style={styles.successIconWrap}>
+              <Ionicons name="checkmark-circle" size={72} color="#10b981" />
+            </View>
+            <Text style={styles.successTitle}>
+              {language === 'vi' ? 'Thanh toán thành công!' : 'Payment Successful!'}
+            </Text>
+            <Text style={styles.successSubtitle}>
+              {language === 'vi'
+                ? 'Gói đăng ký của bạn đã được kích hoạt.'
+                : 'Your subscription has been activated.'}
+            </Text>
+
+            {subscription && (
+              <View style={styles.successDetails}>
+                <View style={styles.successDetailRow}>
+                  <Text style={styles.successDetailLabel}>
+                    {language === 'vi' ? 'Gói' : 'Plan'}
+                  </Text>
+                  <Text style={styles.successDetailValue}>{getTierName(subscription.tier)}</Text>
+                </View>
+                <View style={styles.successDetailRow}>
+                  <Text style={styles.successDetailLabel}>
+                    {language === 'vi' ? 'Chu kỳ' : 'Billing cycle'}
+                  </Text>
+                  <Text style={styles.successDetailValue}>
+                    {getBillingCycleLabel(subscription.billing_cycle)}
+                  </Text>
+                </View>
+                <View style={styles.successDetailRow}>
+                  <Text style={styles.successDetailLabel}>
+                    {language === 'vi' ? 'Ngày kích hoạt' : 'Start date'}
+                  </Text>
+                  <Text style={styles.successDetailValue}>
+                    {formatDate(subscription.start_date || subscription.startDate)}
+                  </Text>
+                </View>
+                <View style={styles.successDetailRow}>
+                  <Text style={styles.successDetailLabel}>
+                    {language === 'vi' ? 'Ngày hết hạn' : 'End date'}
+                  </Text>
+                  <Text style={styles.successDetailValue}>
+                    {formatDate(subscription.end_date || subscription.endDate || subscription.nextBillingDate)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.successButton}
+              onPress={() => setShowPaymentSuccessModal(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.successButtonText}>
+                {language === 'vi' ? 'Xem gói hiện tại' : 'View current plan'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </AppShell>
   );
 }
@@ -783,8 +1234,9 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
   loadingText: { color: '#94a3b8', fontSize: 15 },
 
-  tabs: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, gap: 8 },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 10, backgroundColor: '#1e293b' },
+  tabsScroll: { maxHeight: 56 },
+  tabs: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, gap: 8, paddingBottom: 4 },
+  tab: { paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', borderRadius: 10, backgroundColor: '#1e293b' },
   tabActive: { backgroundColor: '#10b981' },
   tabText: { fontSize: 14, fontWeight: '600', color: '#94a3b8' },
   tabTextActive: { color: '#fff' },
@@ -834,30 +1286,39 @@ const styles = StyleSheet.create({
 
   // Plans
   plansContainer: { flex: 1, padding: 16 },
-  plansSubtitle: { fontSize: 15, color: '#94a3b8', marginBottom: 16 },
+  cycleRow: { flexDirection: 'row', gap: 10, marginBottom: 16, justifyContent: 'center' },
+  cycleChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: '#1e293b', borderWidth: 1.5, borderColor: '#334155' },
+  cycleChipActive: { backgroundColor: '#10b981', borderColor: '#10b981' },
+  cycleChipText: { fontSize: 14, fontWeight: '600', color: '#94a3b8' },
+  cycleChipTextActive: { color: '#fff' },
   plansScroll: { flex: 1 },
 
-  planCard: { backgroundColor: '#1e293b', borderRadius: 20, padding: 20, paddingTop: 24, marginBottom: 16, borderWidth: 0, position: 'relative', overflow: 'visible' },
-  planCardRecommended: { borderWidth: 0 },
+  planCard: { backgroundColor: '#1e293b', borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 2, borderColor: 'transparent' },
+  planCardPopular: { borderColor: '#34d399' },
   planCardCurrent: { borderWidth: 2, borderColor: '#22c55e' },
-  planCardSelected: { borderWidth: 2, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.08)' },
+  planCardSelected: { borderWidth: 2, borderColor: '#10b981' },
 
-  recommendedBadge: { position: 'absolute', top: -10, left: 16, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, zIndex: 1 },
-  recommendedBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
-  currentBadge: { position: 'absolute', top: -10, left: 16, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#22c55e', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, zIndex: 1 },
+  popularBadge: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, zIndex: 1, backgroundColor: '#10b981' },
+  popularBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  currentBadge: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#22c55e', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, zIndex: 1 },
+  currentBadgeOnPopular: { top: 44 },
   currentBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
-  selectedIndicator: { position: 'absolute', top: -10, right: 16, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  planHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
-  planIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  planTitleGroup: { flex: 1 },
-  planName: { fontSize: 22, fontWeight: '700', color: '#94a3b8' },
-  planPrice: { fontSize: 24, fontWeight: '700', color: '#64748b', marginTop: 2 },
-  planPeriod: { fontSize: 14, color: '#64748b', fontWeight: '400' },
+  selectedIndicator: { position: 'absolute', top: 12, right: 12, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  planHeader: { marginBottom: 16 },
+  planName: { fontSize: 28, fontWeight: '700', color: '#f1f5f9', marginBottom: 8 },
+  planPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
+  planPrice: { fontSize: 32, fontWeight: '700', color: '#64748b' },
+  planPeriod: { fontSize: 14, color: '#94a3b8', fontWeight: '400' },
 
-  planFeatures: { marginBottom: 12, gap: 10 },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  featureText: { fontSize: 13, color: '#64748b', flex: 1 },
-  featureTextSelected: { color: '#f1f5f9', fontWeight: '500' },
+  planDescriptionText: { fontSize: 14, color: '#94a3b8', marginBottom: 12, lineHeight: 20 },
+  planDescriptionTextSelected: { color: '#e2e8f0' },
+
+  planDescription: { marginBottom: 16, gap: 8 },
+  planFeatureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  planFeatureBullet: { fontSize: 16, lineHeight: 20, color: '#94a3b8', marginRight: -2 },
+  planFeatureBulletSelected: { color: '#f1f5f9' },
+  planFeatureText: { flex: 1, fontSize: 14, color: '#94a3b8', lineHeight: 20 },
+  planFeatureTextSelected: { color: '#f1f5f9' },
 
   selectAction: { marginTop: 8, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
   selectActionText: { fontSize: 14, fontWeight: '600', color: '#fff' },
@@ -865,7 +1326,22 @@ const styles = StyleSheet.create({
   confirmSection: { marginTop: 8, marginBottom: 24 },
   confirmButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#10b981', paddingVertical: 16, borderRadius: 14 },
   confirmButtonText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  confirmNote: { fontSize: 12, color: '#64748b', textAlign: 'center', marginTop: 10 },
+  confirmNote: { fontSize: 12, color: '#94a3b8', textAlign: 'center', marginTop: 10 },
+
+  // Confirm Modal
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.82)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  confirmModal: { width: '100%', maxWidth: 420, backgroundColor: '#0f172a', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: 'rgba(148, 163, 184, 0.16)' },
+  confirmModalTitle: { fontSize: 18, fontWeight: '700', color: '#f8fafc', marginBottom: 14 },
+  confirmModalLabel: { fontSize: 12, color: '#94a3b8', marginTop: 10, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
+  confirmModalValue: { fontSize: 16, fontWeight: '700', color: '#f8fafc' },
+  confirmModalPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  confirmModalPrice: { fontSize: 28, fontWeight: '700', color: '#10b981' },
+  confirmModalCycleLabel: { fontSize: 14, color: '#94a3b8' },
+  confirmModalActions: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  confirmModalCancel: { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', backgroundColor: '#1e293b' },
+  confirmModalCancelText: { fontSize: 14, fontWeight: '700', color: '#e2e8f0' },
+  confirmModalConfirm: { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', backgroundColor: '#10b981' },
+  confirmModalConfirmText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 
   // Payment
   paymentCard: { backgroundColor: '#1e293b', borderRadius: 20, padding: 20 },
@@ -883,4 +1359,36 @@ const styles = StyleSheet.create({
   expiresInfo: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(245, 158, 11, 0.1)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginBottom: 16 },
   expiresText: { fontSize: 13, color: '#f59e0b', fontWeight: '500' },
   paymentNote: { fontSize: 13, color: '#94a3b8', lineHeight: 20 },
+  pollingStatus: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(245, 158, 11, 0.12)', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, marginBottom: 16 },
+  pollingStatusText: { fontSize: 14, color: '#f59e0b', fontWeight: '600' },
+
+  successOverlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  successModal: { width: '100%', maxWidth: 420, backgroundColor: '#0f172a', borderRadius: 24, padding: 24, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)', alignItems: 'center' },
+  successIconWrap: { marginBottom: 16 },
+  successTitle: { fontSize: 22, fontWeight: '700', color: '#f8fafc', textAlign: 'center', marginBottom: 8 },
+  successSubtitle: { fontSize: 14, color: '#94a3b8', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+  successDetails: { width: '100%', backgroundColor: '#1e293b', borderRadius: 16, padding: 16, gap: 12, marginBottom: 20 },
+  successDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  successDetailLabel: { fontSize: 13, color: '#64748b' },
+  successDetailValue: { fontSize: 14, fontWeight: '600', color: '#f1f5f9', textAlign: 'right', flex: 1 },
+  successButton: { width: '100%', backgroundColor: '#10b981', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+  successButtonText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+
+  historyHeader: { marginBottom: 16 },
+  historyTitle: { fontSize: 18, fontWeight: '700', color: '#f1f5f9', marginBottom: 4 },
+  historySubtitle: { fontSize: 13, color: '#94a3b8', lineHeight: 18 },
+  historyLoading: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12 },
+  historyEmpty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 24, gap: 10 },
+  historyEmptyTitle: { fontSize: 16, fontWeight: '700', color: '#f1f5f9', marginTop: 8 },
+  historyEmptyText: { fontSize: 13, color: '#94a3b8', textAlign: 'center', lineHeight: 20 },
+  historyCard: { backgroundColor: '#1e293b', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#334155' },
+  historyCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 },
+  historyTierBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  historyTierText: { fontSize: 12, fontWeight: '700' },
+  historyStatusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  historyStatusText: { fontSize: 11, fontWeight: '700' },
+  historyAmount: { fontSize: 24, fontWeight: '700', color: '#10b981', marginBottom: 12 },
+  historyRow: { marginBottom: 8 },
+  historyLabel: { fontSize: 11, color: '#64748b', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 },
+  historyValue: { fontSize: 14, color: '#e2e8f0', fontWeight: '500' },
 });

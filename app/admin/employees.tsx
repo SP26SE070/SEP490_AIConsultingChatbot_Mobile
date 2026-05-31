@@ -8,6 +8,7 @@ import { useFocusEffect } from 'expo-router';
 import { AppShell } from '../../components/layout/AppShell';
 import { useLanguageStore, translations } from '../../lib/language-store';
 import { getAccessToken } from '../../lib/auth-store';
+import { TENANT_ADMIN_BASE } from '../../lib/api/config';
 import { useNotification } from '../../lib/notification';
 
 interface Employee {
@@ -70,12 +71,12 @@ export default function AdminEmployeesScreen() {
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
 
-  const API_BASE = 'http://10.0.2.2:8080/api/v1';
+  const TENANT_BASE = TENANT_ADMIN_BASE;
 
   async function fetchEmployees() {
     try {
       const token = await getAccessToken();
-      const res = await fetch(`${API_BASE}/tenant-admin/users?status=${statusFilter}`, {
+      const res = await fetch(`${TENANT_BASE}/users?status=${statusFilter}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch');
@@ -93,7 +94,7 @@ export default function AdminEmployeesScreen() {
   async function fetchRoles() {
     try {
       const token = await getAccessToken();
-      const res = await fetch(`${API_BASE}/tenant-admin/roles`, {
+      const res = await fetch(`${TENANT_BASE}/roles`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -158,7 +159,7 @@ export default function AdminEmployeesScreen() {
     setProcessing(true);
     try {
       const token = await getAccessToken();
-      await fetch(`${API_BASE}/tenant-admin/users/${selectedEmployee.id}`, {
+      await fetch(`${TENANT_BASE}/users/${selectedEmployee.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -223,7 +224,7 @@ export default function AdminEmployeesScreen() {
     setProcessing(true);
     try {
       const token = await getAccessToken();
-      const res = await fetch(`${API_BASE}/tenant-admin/users/${selectedEmployee.id}/permissions`, {
+      const res = await fetch(`${TENANT_BASE}/users/${selectedEmployee.id}/permissions`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -276,7 +277,7 @@ export default function AdminEmployeesScreen() {
     setProcessing(true);
     try {
       const token = await getAccessToken();
-      await fetch(`${API_BASE}/tenant-admin/users/${employee.id}/${action}`, {
+      await fetch(`${TENANT_BASE}/users/${employee.id}/${action}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -302,7 +303,7 @@ export default function AdminEmployeesScreen() {
 
     try {
       const token = await getAccessToken();
-      await fetch(`${API_BASE}/tenant-admin/users/${employee.id}/reset-password`, {
+      await fetch(`${TENANT_BASE}/users/${employee.id}/reset-password`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
