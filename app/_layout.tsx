@@ -24,6 +24,7 @@ export default function RootLayout() {
             <Stack.Screen name="admin/employees" />
             <Stack.Screen name="admin/subscription" />
             <Stack.Screen name="admin/ai-settings" />
+            <Stack.Screen name="admin/organization-settings" />
           </Stack>
         </NotificationProvider>
       </SafeAreaProvider>

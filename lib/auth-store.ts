@@ -1,12 +1,14 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-const ACCESS_TOKEN_KEY = 'auth_access_token';
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
 const USER_KEY = 'auth_user';
 const MUST_CHANGE_PASSWORD_KEY = 'auth_must_change_password';
 
-// Platform-aware storage wrapper
+// Access token stored in MEMORY only - cleared when app restarts
+let _accessToken: string | null = null;
+
+// Platform-aware storage for persistent data (refresh token, user info)
 const storage = {
   async setItem(key: string, value: string): Promise<void> {
     if (Platform.OS === 'web') {
@@ -33,7 +35,11 @@ const storage = {
 
 export async function setAuth(data: any): Promise<void> {
   if (!data.accessToken || !data.refreshToken) return;
-  await storage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+  
+  // Store access token in memory (session only)
+  _accessToken = data.accessToken;
+  
+  // Store refresh token persistently
   await storage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
   await storage.setItem(USER_KEY, JSON.stringify({
     id: data.id,
@@ -42,14 +48,17 @@ export async function setAuth(data: any): Promise<void> {
     roles: data.roles,
     permissions: data.permissions ?? [],
   }));
-  // Save mustChangePassword flag
   if (data.mustChangePassword !== undefined) {
     await storage.setItem(MUST_CHANGE_PASSWORD_KEY, String(data.mustChangePassword));
   }
 }
 
 export async function getAccessToken(): Promise<string | null> {
-  return await storage.getItem(ACCESS_TOKEN_KEY);
+  return _accessToken;
+}
+
+export async function setAccessToken(token: string): Promise<void> {
+  _accessToken = token;
 }
 
 export async function getUser(): Promise<any | null> {
@@ -58,7 +67,7 @@ export async function getUser(): Promise<any | null> {
 }
 
 export async function clearAuth(): Promise<void> {
-  await storage.deleteItem(ACCESS_TOKEN_KEY);
+  _accessToken = null;
   await storage.deleteItem(REFRESH_TOKEN_KEY);
   await storage.deleteItem(USER_KEY);
   await storage.deleteItem(MUST_CHANGE_PASSWORD_KEY);
@@ -73,7 +82,6 @@ export async function hasPermission(permission: string): Promise<boolean> {
   const user = await getUser();
   const permissions: string[] = user?.permissions ?? [];
   const roles: string[] = user?.roles ?? [];
-  // Check both permissions array and roles
   return permissions.includes(permission) || roles.includes(permission);
 }
 

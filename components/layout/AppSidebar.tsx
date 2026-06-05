@@ -8,7 +8,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
-import { clearAuth, isRole } from '../../lib/auth-store';
+import { clearAuth, isRole, getUser } from '../../lib/auth-store';
+import { clearChatSession } from '../../lib/chat-session-store';
 import { requestNewChat } from '../../lib/navigation-store';
 import { useLanguageStore, translations } from '../../lib/language-store';
 import { AppLogo } from '../brand/AppLogo';
@@ -41,6 +42,7 @@ const ADMIN_NAV: NavItem[] = [
   { href: '/documents', labelKey: 'documents', icon: 'document-text-outline', iconActive: 'document-text' },
   { href: '/analytics', labelKey: 'analytics', icon: 'analytics-outline', iconActive: 'analytics' },
   { href: '/admin/employees', labelKey: 'manageEmployees', icon: 'people-outline', iconActive: 'people' },
+  { href: '/admin/organization-settings', labelKey: 'organizationSettings', icon: 'business-outline', iconActive: 'business' },
   { href: '/admin/ai-settings', labelKey: 'aiSettings', icon: 'bulb-outline', iconActive: 'bulb' },
   { href: '/admin/subscription', labelKey: 'subscription', icon: 'card-outline', iconActive: 'card' },
 ];
@@ -85,6 +87,14 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
   }
 
   async function handleLogout() {
+    try {
+      const user = await getUser();
+      if (user?.id) {
+        await clearChatSession(user.id);
+      }
+    } catch {
+      // ignore
+    }
     await clearAuth();
     onNavigate?.();
     router.replace('/login');

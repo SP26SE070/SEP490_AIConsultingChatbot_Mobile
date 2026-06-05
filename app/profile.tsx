@@ -8,9 +8,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { getProfile, updateProfile, sendOtpForContactEmail, updateContactEmail } from '../lib/api/profile';
 import { AppShell } from '../components/layout/AppShell';
+import { useLanguageStore, translations } from '../lib/language-store';
 import { useNotification } from '../lib/notification';
 
 export default function ProfileScreen() {
+  const { language } = useLanguageStore();
+  const isVi = language === 'vi';
   const { showToast, showSuccess, showError } = useNotification();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -393,11 +396,31 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Organization Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{isVi ? 'Tổ chức' : 'Organization'}</Text>
+          <View style={styles.infoCard}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => router.push('/admin/organization-settings')}
+            >
+              <View style={styles.menuIcon}>
+                <Ionicons name="business-outline" size={20} color="#10b981" />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>{isVi ? 'Cài đặt tổ chức' : 'Organization Settings'}</Text>
+                <Text style={styles.menuSubtitle}>{isVi ? 'Logo, địa chỉ, website' : 'Logo, address, website'}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Security Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bảo mật</Text>
+          <Text style={styles.sectionTitle}>{isVi ? 'Bảo mật' : 'Security'}</Text>
           <View style={styles.infoCard}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.menuItem}
               onPress={() => router.push('/change-password')}
             >
@@ -405,8 +428,8 @@ export default function ProfileScreen() {
                 <Ionicons name="key-outline" size={20} color="#10b981" />
               </View>
               <View style={styles.menuContent}>
-                <Text style={styles.menuTitle}>Đổi mật khẩu</Text>
-                <Text style={styles.menuSubtitle}>Cập nhật mật khẩu mới</Text>
+                <Text style={styles.menuTitle}>{isVi ? 'Đổi mật khẩu' : 'Change Password'}</Text>
+                <Text style={styles.menuSubtitle}>{isVi ? 'Cập nhật mật khẩu mới' : 'Update your password'}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#64748b" />
             </TouchableOpacity>

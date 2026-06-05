@@ -15,6 +15,7 @@ import { getAccessToken } from '../lib/auth-store';
 import { KNOWLEDGE_BASE, CATEGORIES_BASE, TAGS_BASE, API_BASE_URL } from '../lib/api/config';
 import { useNotification } from '../lib/notification';
 import { PickerModal } from '../components/ui/CustomModal';
+import { GoogleDrivePicker } from '../components/GoogleDrivePicker';
 
 const API_TIMEOUT = 15000;
 const DOWNLOAD_HISTORY_KEY = 'download_history';
@@ -97,6 +98,66 @@ async function apiRequest(url: string, options: RequestInit = {}): Promise<Respo
   return res;
 }
 
+function extractDriveFileId(input: string): string | null {
+  const trimmed = input.trim();
+  const idMatch = trimmed.match(/[-\w]{25,}/);
+  if (!idMatch) return null;
+
+  const id = idMatch[0];
+
+  // If there are multiple IDs (e.g. from export links), prefer the longest alphanumeric one
+  const allIds = trimmed.match(/[-\w]{25,}/g) || [];
+  if (allIds.length > 1) {
+    const candidates = allIds.map(value => ({ value, score: (value.match(/[a-zA-Z]/g) || []).length }));
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0]?.value || id;
+  }
+
+  return id;
+}
+
+async function getDriveFileName(fileId: string): Promise<string | undefined> {
+  const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=name`;
+  const res = await fetch(url, { method: 'GET' });
+  if (!res.ok) return undefined;
+  const data = await res.json();
+  return data.name;
+}
+
+async function downloadDriveFile(fileId: string, isVi: boolean): Promise<{ uri: string; name?: string }> {
+  const downloadUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
+  const fileName = await getDriveFileName(fileId);
+  const fileUri = `${FileSystem?.CacheDirectory || ''}${fileName || `drive_${fileId}`}`;
+  const downloadResumable = FileSystem.createDownloadResumable(downloadUrl, fileUri);
+  const result = await downloadResumable.downloadAsync();
+  if (!result) throw new Error(isVi ? 'Không thể tải file từ Google Drive' : 'Failed to download file from Google Drive');
+  return { uri: result.uri, name: fileName };
+}
+
+async function handleDriveUpload(driveLink: string, isVi: boolean, uploadTitle: string, setUploadFile: (f: { uri: string; name: string; type: string; size: number } | null) => void, setUploadTitle: (t: string) => void, setShowDriveLinkInput: (v: boolean) => void, setDriveLink: (l: string) => void, showSuccess: (msg: string, title: string) => void, showError: (msg: string, title: string) => void, setUploading: (v: boolean) => void) {
+  const fileId = extractDriveFileId(driveLink);
+  if (!fileId) {
+    showError(isVi ? 'Link Google Drive không hợp lệ' : 'Invalid Google Drive link', isVi ? 'Lỗi' : 'Error');
+    return;
+  }
+  setUploading(true);
+  try {
+    const { uri, name } = await downloadDriveFile(fileId, isVi);
+    setUploadFile({ uri, name: name || 'drive_file', type: 'application/octet-stream', size: 0 });
+    if (!uploadTitle.trim()) {
+      const title = name?.replace(/\.[^/.]+$/, '') || '';
+      if (title) setUploadTitle(title);
+    }
+    setShowDriveLinkInput(false);
+    setDriveLink('');
+    showSuccess(isVi ? 'Đã lấy file từ Google Drive' : 'File loaded from Google Drive', isVi ? 'Thành công' : 'Success');
+  } catch (e: any) {
+    showError(e.message || (isVi ? 'Không thể lấy file từ Google Drive' : 'Failed to get file from Google Drive'), isVi ? 'Lỗi' : 'Error');
+  } finally {
+    setUploading(false);
+  }
+}
+
 export default function DocumentsScreen() {
   const { language } = useLanguageStore();
   const t = translations[language];
@@ -138,6 +199,9 @@ export default function DocumentsScreen() {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [categories, setCategories] = useState<DocumentCategoryResponse[]>([]);
   const [tags, setTags] = useState<DocumentTagResponse[]>([]);
+  const [showDriveLinkInput, setShowDriveLinkInput] = useState(false);
+  const [driveLink, setDriveLink] = useState('');
+  const [showGoogleDrivePicker, setShowGoogleDrivePicker] = useState(false);
 
   // ========== CATEGORIES STATE ==========
   const [catList, setCatList] = useState<DocumentCategoryResponse[]>([]);
@@ -657,13 +721,18 @@ export default function DocumentsScreen() {
             <Text style={styles.formLabel}>{isVi ? 'Mô tả' : 'Description'}</Text>
             <TextInput style={[styles.input, { height: 80 }]} value={uploadDescription} onChangeText={setUploadDescription} placeholder={isVi ? 'Mô tả tài liệu' : 'Document description'} placeholderTextColor="#64748b" multiline />
             <TouchableOpacity style={styles.filePickerBtn} onPress={async () => {
-              const result = await documentPicker.getDocument({ type: '*/*' });
-              if (result[0]) {
-                setUploadFile({ uri: result[0].uri, name: result[0].name || 'file', type: result[0].mimeType || 'application/octet-stream', size: result[0].size || 0 });
+              const result = await documentPicker.getDocumentAsync({ type: '*/*' });
+              if (!result.canceled && result.assets && result.assets[0]) {
+                const asset = result.assets[0];
+                setUploadFile({ uri: asset.uri, name: asset.name || 'file', type: asset.mimeType || 'application/octet-stream', size: asset.size || 0 });
               }
             }}>
               <Ionicons name="cloud-upload-outline" size={32} color="#10b981" />
-              <Text style={styles.filePickerText}>{uploadFile ? uploadFile.name : (isVi ? 'Chọn file' : 'Select file')}</Text>
+              <Text style={styles.filePickerText}>{uploadFile ? uploadFile.name : (isVi ? 'Chọn file từ thiết bị' : 'Select from device')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.drivePickerBtn} onPress={() => setShowGoogleDrivePicker(true)}>
+              <Ionicons name="logo-google" size={32} color="#4285F4" />
+              <Text style={styles.drivePickerText}>{isVi ? 'Google Drive (Đăng nhập)' : 'Google Drive (Sign In)'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.submitBtn, uploading && styles.submitBtnDisabled]} onPress={handleUpload} disabled={uploading}>
               {uploading ? <ActivityIndicator color="#fff" /> : <><Ionicons name="cloud-done" size={20} color="#fff" /><Text style={styles.submitBtnText}>{isVi ? 'Tải lên' : 'Upload'}</Text></>}
@@ -671,6 +740,22 @@ export default function DocumentsScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Google Drive Picker Modal */}
+      <GoogleDrivePicker
+        visible={showGoogleDrivePicker}
+        onClose={() => setShowGoogleDrivePicker(false)}
+        onFileSelected={(file) => {
+          setUploadFile({ uri: file.uri, name: file.name, type: file.type, size: 0 });
+          if (!uploadTitle.trim()) {
+            const title = file.name.replace(/\.[^/.]+$/, '');
+            if (title) setUploadTitle(title);
+          }
+          setShowGoogleDrivePicker(false);
+        }}
+        isVi={isVi}
+        isImageOnly={false}
+      />
 
       {/* Category Modal */}
       <Modal visible={showCatModal} animationType="slide" onRequestClose={() => setShowCatModal(false)}>
@@ -815,6 +900,9 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#1e293b', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#f1f5f9', borderWidth: 1, borderColor: '#334155' },
   filePickerBtn: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e293b', borderRadius: 12, padding: 32, borderWidth: 2, borderStyle: 'dashed', borderColor: '#334155', gap: 12 },
   filePickerText: { fontSize: 15, color: '#64748b' },
+  drivePickerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e293b', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#4285F4', gap: 12 },
+  drivePickerText: { fontSize: 15, color: '#4285F4', fontWeight: '600' },
+  formHelpText: { fontSize: 12, color: '#64748b', marginTop: -8 },
   submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#10b981', paddingVertical: 14, borderRadius: 12, marginTop: 8 },
   submitBtnDisabled: { opacity: 0.6 },
   submitBtnText: { fontSize: 15, color: '#fff', fontWeight: '600' },

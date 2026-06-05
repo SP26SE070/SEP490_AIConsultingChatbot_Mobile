@@ -3,10 +3,10 @@
     "name": "SEP490_AIConsultingChatbot_Mobile",
     "slug": "SEP490_AIConsultingChatbot_Mobile",
     "version": "1.0.1",
-    "scheme": "chatbot-app",
+    "scheme": "sep490-aiconsulting",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -23,7 +23,7 @@
       },
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.SEP490_AIConsultingChatbot_Mobile"
+      "package": "com.sep490.aiconsultingchatbot"
     },
     "web": {
       "favicon": "./assets/favicon.png"

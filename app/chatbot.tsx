@@ -21,11 +21,12 @@ import { isRatingMessageId, resolveServerMessageId } from '../lib/chatMessageId'
 import { getPendingConversation, consumeNewChatRequest } from '../lib/navigation-store';
 import { useNotification } from '../lib/notification';
 import { saveChatSession, loadChatSession, clearChatSession } from '../lib/chat-session-store';
+import { migrateOldChatSessionIfExists } from '../lib/chat-session-migration';
 import { COLORS } from '../lib/theme';
 import { AppShell } from '../components/layout/AppShell';
 import { useLanguageStore, translations } from '../lib/language-store';
 import { TAGS_BASE } from '../lib/api/config';
-import { getAccessToken } from '../lib/auth-store';
+import { getAccessToken, getUser } from '../lib/auth-store';
 
 interface Message {
   id: string;
@@ -158,6 +159,7 @@ export default function ChatbotScreen() {
   const navigation = useNavigation();
   const { showConfirm } = useNotification();
   
+  const [userId, setUserId] = useState<string | undefined>();
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -211,24 +213,29 @@ export default function ChatbotScreen() {
     setSelectedTagIds([]);
   }
 
-  // Load saved session on mount
+  // Load user and saved session on mount
   useEffect(() => {
-    const loadSavedSession = async () => {
-      const savedSession = await loadChatSession();
-      if (savedSession && savedSession.messages.length > 0) {
-        setMessages(savedSession.messages);
-        setConversationId(savedSession.conversationId);
+    const initialize = async () => {
+      await migrateOldChatSessionIfExists();
+      const user = await getUser();
+      if (user?.id) {
+        setUserId(user.id);
+        const savedSession = await loadChatSession(user.id);
+        if (savedSession && savedSession.messages.length > 0) {
+          setMessages(savedSession.messages);
+          setConversationId(savedSession.conversationId);
+        }
       }
     };
-    loadSavedSession();
+    initialize();
   }, []);
 
   // Save session when messages change (debounced)
   useEffect(() => {
-    if (messages.length > 0 && !historyLoading) {
-      saveChatSession({ conversationId, messages, lastUpdated: Date.now() });
+    if (messages.length > 0 && !historyLoading && userId) {
+      saveChatSession(userId, { conversationId, messages, lastUpdated: Date.now() });
     }
-  }, [messages, conversationId, historyLoading]);
+  }, [messages, conversationId, historyLoading, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -265,7 +272,9 @@ export default function ChatbotScreen() {
         setMessages(loadedMessages);
         setConversationId(convId);
         // Save loaded session
-        await saveChatSession({ conversationId: convId, messages: loadedMessages, lastUpdated: Date.now() });
+        if (userId) {
+          await saveChatSession(userId, { conversationId: convId, messages: loadedMessages, lastUpdated: Date.now() });
+        }
       }
     } catch (e: any) {
       console.warn('Failed to load conversation history:', e);
@@ -355,7 +364,9 @@ export default function ChatbotScreen() {
       iconColor: '#10b981',
     });
     if (!confirmed) return;
-    await clearChatSession();
+    if (userId) {
+      await clearChatSession(userId);
+    }
     setConversationId(undefined);
     setMessages([]);
   }
