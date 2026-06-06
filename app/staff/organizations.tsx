@@ -11,6 +11,7 @@ import { getAccessToken } from '../../lib/auth-store';
 import { API_BASE_URL } from '../../lib/api/config';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../../components/ui/CustomModal';
 import { useNotification } from '../../lib/notification';
+import { useResponsive } from '../../lib/useResponsive';
 
 interface Tenant {
   id: string;
@@ -46,6 +47,7 @@ export default function StaffOrganizationsScreen() {
   const t = translations[language];
   const isVi = language === 'vi';
   const { showError } = useNotification();
+  const { sz, fs, gap, width } = useResponsive();
   
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -273,7 +275,7 @@ export default function StaffOrganizationsScreen() {
       <AppShell title={t.approveTenant} subtitle={isVi ? 'Quản lý tổ chức' : 'Manage Tenants'}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#10b981" />
-          <Text style={styles.loadingText}>{t.loading}</Text>
+          <Text style={[styles.loadingText, { fontSize: fs(15) }]}>{t.loading}</Text>
         </View>
       </AppShell>
     );
@@ -282,27 +284,27 @@ export default function StaffOrganizationsScreen() {
   return (
     <AppShell title={t.approveTenant} subtitle={isVi ? 'Quản lý tổ chức' : 'Manage Tenants'}>
       {/* Summary Stats */}
-      <View style={styles.summaryRow}>
-        <View style={[styles.summaryCard, { backgroundColor: 'rgba(245, 158, 11, 0.08)' }]}>
-          <View style={[styles.summaryIconWrap, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
-            <Ionicons name="time-outline" size={18} color="#f59e0b" />
+      <View style={[styles.summaryRow, { paddingHorizontal: sz(16), paddingVertical: sz(12), gap: sz(10) }]}>
+        <View style={[styles.summaryCard, { backgroundColor: 'rgba(245, 158, 11, 0.08)', paddingVertical: sz(14), paddingHorizontal: sz(8), borderRadius: sz(16) }]}>
+          <View style={[styles.summaryIconWrap, { backgroundColor: 'rgba(245, 158, 11, 0.15)', width: sz(36), height: sz(36), borderRadius: sz(10), marginBottom: sz(6) }]}>
+            <Ionicons name="time-outline" size={sz(18)} color="#f59e0b" />
           </View>
-          <Text style={styles.summaryValue}>{pendingCount}</Text>
-          <Text style={styles.summaryLabel}>{isVi ? 'Chờ duyệt' : 'Pending'}</Text>
+          <Text style={[styles.summaryValue, { fontSize: fs(22) }]}>{pendingCount}</Text>
+          <Text style={[styles.summaryLabel, { fontSize: fs(11), marginTop: sz(2) }]}>{isVi ? 'Chờ duyệt' : 'Pending'}</Text>
         </View>
-        <View style={[styles.summaryCard, { backgroundColor: 'rgba(34, 197, 94, 0.08)' }]}>
-          <View style={[styles.summaryIconWrap, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
-            <Ionicons name="checkmark-circle-outline" size={18} color="#22c55e" />
+        <View style={[styles.summaryCard, { backgroundColor: 'rgba(34, 197, 94, 0.08)', paddingVertical: sz(14), paddingHorizontal: sz(8), borderRadius: sz(16) }]}>
+          <View style={[styles.summaryIconWrap, { backgroundColor: 'rgba(34, 197, 94, 0.15)', width: sz(36), height: sz(36), borderRadius: sz(10), marginBottom: sz(6) }]}>
+            <Ionicons name="checkmark-circle-outline" size={sz(18)} color="#22c55e" />
           </View>
-          <Text style={styles.summaryValue}>{tenants.filter(t => t.status === 'ACTIVE').length}</Text>
-          <Text style={styles.summaryLabel}>{isVi ? 'Hoạt động' : 'Active'}</Text>
+          <Text style={[styles.summaryValue, { fontSize: fs(22) }]}>{tenants.filter(t => t.status === 'ACTIVE').length}</Text>
+          <Text style={[styles.summaryLabel, { fontSize: fs(11), marginTop: sz(2) }]}>{isVi ? 'Hoạt động' : 'Active'}</Text>
         </View>
-        <View style={[styles.summaryCard, { backgroundColor: 'rgba(148, 163, 184, 0.08)' }]}>
-          <View style={[styles.summaryIconWrap, { backgroundColor: 'rgba(148, 163, 184, 0.15)' }]}>
-            <Ionicons name="business-outline" size={18} color="#94a3b8" />
+        <View style={[styles.summaryCard, { backgroundColor: 'rgba(148, 163, 184, 0.08)', paddingVertical: sz(14), paddingHorizontal: sz(8), borderRadius: sz(16) }]}>
+          <View style={[styles.summaryIconWrap, { backgroundColor: 'rgba(148, 163, 184, 0.15)', width: sz(36), height: sz(36), borderRadius: sz(10), marginBottom: sz(6) }]}>
+            <Ionicons name="business-outline" size={sz(18)} color="#94a3b8" />
           </View>
-          <Text style={styles.summaryValue}>{tenants.length}</Text>
-          <Text style={styles.summaryLabel}>{isVi ? 'Tổng cộng' : 'Total'}</Text>
+          <Text style={[styles.summaryValue, { fontSize: fs(22) }]}>{tenants.length}</Text>
+          <Text style={[styles.summaryLabel, { fontSize: fs(11), marginTop: sz(2) }]}>{isVi ? 'Tổng cộng' : 'Total'}</Text>
         </View>
       </View>
 
@@ -310,17 +312,17 @@ export default function StaffOrganizationsScreen() {
       <FlatList
         data={tenants}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingHorizontal: sz(16), paddingBottom: sz(20), gap: sz(12) }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10b981" />
         }
         ListEmptyComponent={
-          <View style={styles.emptyCard}>
-            <View style={styles.emptyIconWrap}>
-              <Ionicons name="business-outline" size={40} color="#10b981" />
+          <View style={[styles.emptyCard, { paddingVertical: sz(60), paddingHorizontal: sz(20) }]}>
+            <View style={[styles.emptyIconWrap, { width: sz(80), height: sz(80), borderRadius: sz(40), marginBottom: sz(16) }]}>
+              <Ionicons name="business-outline" size={sz(40)} color="#10b981" />
             </View>
-            <Text style={styles.emptyTitle}>{isVi ? 'Chưa có tổ chức nào' : 'No organizations yet'}</Text>
-            <Text style={styles.emptySubtitle}>{isVi ? 'Danh sách tổ chức đăng ký sẽ xuất hiện tại đây' : 'Registered organizations will appear here'}</Text>
+            <Text style={[styles.emptyTitle, { fontSize: fs(17), marginBottom: sz(6) }]}>{isVi ? 'Chưa có tổ chức nào' : 'No organizations yet'}</Text>
+            <Text style={[styles.emptySubtitle, { fontSize: fs(13) }]}>{isVi ? 'Danh sách tổ chức đăng ký sẽ xuất hiện tại đây' : 'Registered organizations will appear here'}</Text>
           </View>
         }
         renderItem={({ item }) => {
@@ -330,23 +332,23 @@ export default function StaffOrganizationsScreen() {
 
           return (
             <TouchableOpacity 
-              style={styles.card} 
+              style={[styles.card, { padding: sz(16), borderRadius: sz(16) }]} 
               onPress={() => openDetail(item)}
               activeOpacity={0.75}
             >
               {/* Header */}
-              <View style={styles.cardHeader}>
-                <View style={styles.cardLeft}>
-                  <View style={[styles.cardIcon, { backgroundColor: statusInfo.bg }]}>
-                    <Ionicons name={statusInfo.icon as any} size={18} color={statusInfo.color} />
+              <View style={[styles.cardHeader, { marginBottom: sz(12) }]}>
+                <View style={[styles.cardLeft, { gap: sz(12) }]}>
+                  <View style={[styles.cardIcon, { backgroundColor: statusInfo.bg, width: sz(40), height: sz(40), borderRadius: sz(12) }]}>
+                    <Ionicons name={statusInfo.icon as any} size={sz(18)} color={statusInfo.color} />
                   </View>
                   <View style={styles.cardTitleGroup}>
-                    <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
-                    <Text style={styles.cardEmail} numberOfLines={1}>{item.contactEmail}</Text>
+                    <Text style={[styles.cardTitle, { fontSize: fs(15), letterSpacing: sz(0.2) }]} numberOfLines={1}>{item.name}</Text>
+                    <Text style={[styles.cardEmail, { fontSize: fs(12), marginTop: sz(3) }]} numberOfLines={1}>{item.contactEmail}</Text>
                   </View>
                 </View>
-                <View style={[styles.statusPill, { backgroundColor: statusInfo.bg }]}>
-                  <Text style={[styles.statusPillText, { color: statusInfo.color }]}>
+                <View style={[styles.statusPill, { backgroundColor: statusInfo.bg, paddingHorizontal: sz(10), paddingVertical: sz(5), borderRadius: sz(20) }]}>
+                  <Text style={[styles.statusPillText, { color: statusInfo.color, fontSize: fs(11) }]}>
                     {isVi ? statusInfo.labelVi : statusInfo.labelEn}
                   </Text>
                 </View>
@@ -354,37 +356,37 @@ export default function StaffOrganizationsScreen() {
 
               {/* Representative */}
               {item.representativeName && (
-                <View style={styles.repRow}>
-                  <View style={styles.repItem}>
-                    <Ionicons name="person-outline" size={13} color="#64748b" />
-                    <Text style={styles.repText}>{item.representativeName}</Text>
+                <View style={[styles.repRow, { marginBottom: sz(12), gap: sz(6) }]}>
+                  <View style={[styles.repItem, { gap: sz(4) }]}>
+                    <Ionicons name="person-outline" size={sz(13)} color="#64748b" />
+                    <Text style={[styles.repText, { fontSize: fs(12) }]}>{item.representativeName}</Text>
                   </View>
                   {item.representativePosition && (
-                    <Text style={styles.repSep}>·</Text>
+                    <Text style={[styles.repSep, { fontSize: fs(12) }]}>·</Text>
                   )}
                   {item.representativePosition && (
-                    <View style={styles.repItem}>
-                      <Ionicons name="briefcase-outline" size={13} color="#64748b" />
-                      <Text style={styles.repText}>{item.representativePosition}</Text>
+                    <View style={[styles.repItem, { gap: sz(4) }]}>
+                      <Ionicons name="briefcase-outline" size={sz(13)} color="#64748b" />
+                      <Text style={[styles.repText, { fontSize: fs(12) }]}>{item.representativePosition}</Text>
                     </View>
                   )}
                 </View>
               )}
 
               {/* Actions */}
-              <View style={styles.cardFooter}>
+              <View style={[styles.cardFooter, { paddingTop: sz(10), gap: sz(10) }]}>
                 {isPending ? (
                   <>
                     <TouchableOpacity
-                      style={styles.actionReject}
+                      style={[styles.actionReject, { paddingVertical: sz(10), paddingHorizontal: sz(14), borderRadius: sz(10), gap: sz(5) }]}
                       onPress={() => openRejectModal(item.id)}
                       disabled={isProcessingThis}
                     >
-                      <Ionicons name="close-circle" size={15} color="#f87171" />
-                      <Text style={styles.actionRejectText}>{isVi ? 'Từ chối' : 'Reject'}</Text>
+                      <Ionicons name="close-circle" size={sz(15)} color="#f87171" />
+                      <Text style={[styles.actionRejectText, { fontSize: fs(13) }]}>{isVi ? 'Từ chối' : 'Reject'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.actionApprove, isProcessingThis && styles.actionDisabled]}
+                      style={[styles.actionApprove, { paddingVertical: sz(10), borderRadius: sz(10), gap: sz(5) }]}
                       onPress={() => openApproveConfirm(item.id)}
                       disabled={isProcessingThis}
                     >
@@ -392,16 +394,16 @@ export default function StaffOrganizationsScreen() {
                         <ActivityIndicator size="small" color="#fff" />
                       ) : (
                         <>
-                          <Ionicons name="checkmark-circle" size={15} color="#fff" />
-                          <Text style={styles.actionApproveText}>{isVi ? 'Duyệt' : 'Approve'}</Text>
+                          <Ionicons name="checkmark-circle" size={sz(15)} color="#fff" />
+                          <Text style={[styles.actionApproveText, { fontSize: fs(13) }]}>{isVi ? 'Duyệt' : 'Approve'}</Text>
                         </>
                       )}
                     </TouchableOpacity>
                   </>
                 ) : (
-                  <View style={styles.viewDetailRow}>
-                    <Text style={styles.viewDetailText}>{isVi ? 'Xem chi tiết' : 'View details'}</Text>
-                    <Ionicons name="chevron-forward" size={15} color="#10b981" />
+                  <View style={[styles.viewDetailRow, { gap: sz(4) }]}>
+                    <Text style={[styles.viewDetailText, { fontSize: fs(13) }]}>{isVi ? 'Xem chi tiết' : 'View details'}</Text>
+                    <Ionicons name="chevron-forward" size={sz(15)} color="#10b981" />
                   </View>
                 )}
               </View>
@@ -418,24 +420,24 @@ export default function StaffOrganizationsScreen() {
         onRequestClose={() => setDetailModalOpen(false)}
       >
         <View style={styles.modalWrap}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalHeaderTitle}>{isVi ? 'Chi tiết tổ chức' : 'Organization Details'}</Text>
-            <TouchableOpacity onPress={() => setDetailModalOpen(false)} style={styles.modalCloseBtn}>
-              <Ionicons name="close" size={22} color="#f1f5f9" />
+          <View style={[styles.modalHeader, { paddingHorizontal: sz(20), paddingVertical: sz(16) }]}>
+            <Text style={[styles.modalHeaderTitle, { fontSize: fs(18), letterSpacing: sz(0.3) }]}>{isVi ? 'Chi tiết tổ chức' : 'Organization Details'}</Text>
+            <TouchableOpacity onPress={() => setDetailModalOpen(false)} style={[styles.modalCloseBtn, { padding: sz(4) }]}>
+              <Ionicons name="close" size={sz(22)} color="#f1f5f9" />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+          <ScrollView style={styles.modalScroll} contentContainerStyle={[styles.modalScrollContent, { padding: sz(16), paddingBottom: sz(32) }]}>
             {selectedTenant && (
               <>
                 {/* Status Banner */}
-                <View style={styles.statusBanner}>
+                <View style={[styles.statusBanner, { marginBottom: sz(16) }]}>
                   {(() => {
                     const info = getStatusInfo(selectedTenant.status);
                     return (
-                      <View style={[styles.statusBannerInner, { backgroundColor: info.bg }]}>
-                        <Ionicons name={info.icon as any} size={22} color={info.color} />
-                        <Text style={[styles.statusBannerText, { color: info.color }]}>
+                      <View style={[styles.statusBannerInner, { backgroundColor: info.bg, paddingVertical: sz(12), borderRadius: sz(12), gap: sz(8) }]}>
+                        <Ionicons name={info.icon as any} size={sz(22)} color={info.color} />
+                        <Text style={[styles.statusBannerText, { color: info.color, fontSize: fs(15) }]}>
                           {isVi ? info.labelVi : info.labelEn}
                         </Text>
                       </View>
@@ -444,11 +446,11 @@ export default function StaffOrganizationsScreen() {
                 </View>
 
                 {/* Company Section */}
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>
-                    <Ionicons name="business" size={15} color="#10b981" /> {isVi ? 'Thông tin công ty' : 'Company Information'}
+                <View style={[styles.section, { marginBottom: sz(16) }]}>
+                  <Text style={[styles.sectionTitle, { fontSize: fs(14), marginBottom: sz(10), letterSpacing: sz(0.3) }]}>
+                    <Ionicons name="business" size={sz(15)} color="#10b981" /> {isVi ? 'Thông tin công ty' : 'Company Information'}
                   </Text>
-                  <View style={styles.infoCard}>
+                  <View style={[styles.infoCard, { paddingHorizontal: sz(14), borderRadius: sz(14) }]}>
                     <InfoRow label={isVi ? 'Tên công ty' : 'Company Name'} value={selectedTenant.name} />
                     <InfoRow label={isVi ? 'Email liên hệ' : 'Contact Email'} value={selectedTenant.contactEmail} />
                     {selectedTenant.address && <InfoRow label={isVi ? 'Địa chỉ' : 'Address'} value={selectedTenant.address} />}
@@ -458,11 +460,11 @@ export default function StaffOrganizationsScreen() {
                 </View>
 
                 {/* Representative Section */}
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>
-                    <Ionicons name="person" size={15} color="#10b981" /> {isVi ? 'Người đại diện' : 'Representative'}
+                <View style={[styles.section, { marginBottom: sz(16) }]}>
+                  <Text style={[styles.sectionTitle, { fontSize: fs(14), marginBottom: sz(10), letterSpacing: sz(0.3) }]}>
+                    <Ionicons name="person" size={sz(15)} color="#10b981" /> {isVi ? 'Người đại diện' : 'Representative'}
                   </Text>
-                  <View style={styles.infoCard}>
+                  <View style={[styles.infoCard, { paddingHorizontal: sz(14), borderRadius: sz(14) }]}>
                     {selectedTenant.representativeName && <InfoRow label={isVi ? 'Họ tên' : 'Full Name'} value={selectedTenant.representativeName} />}
                     {selectedTenant.representativePosition && <InfoRow label={isVi ? 'Chức vụ' : 'Position'} value={selectedTenant.representativePosition} />}
                     {selectedTenant.representativePhone && <InfoRow label={isVi ? 'Điện thoại' : 'Phone'} value={selectedTenant.representativePhone} />}
@@ -470,16 +472,16 @@ export default function StaffOrganizationsScreen() {
                 </View>
 
                 {/* Request Section */}
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>
-                    <Ionicons name="document-text" size={15} color="#10b981" /> {isVi ? 'Yêu cầu đăng ký' : 'Registration Request'}
+                <View style={[styles.section, { marginBottom: sz(16) }]}>
+                  <Text style={[styles.sectionTitle, { fontSize: fs(14), marginBottom: sz(10), letterSpacing: sz(0.3) }]}>
+                    <Ionicons name="document-text" size={sz(15)} color="#10b981" /> {isVi ? 'Yêu cầu đăng ký' : 'Registration Request'}
                   </Text>
-                  <View style={styles.infoCard}>
+                  <View style={[styles.infoCard, { paddingHorizontal: sz(14), borderRadius: sz(14) }]}>
                     <InfoRow label={isVi ? 'Ngày đăng ký' : 'Request Date'} value={formatDate(selectedTenant.requestedAt || selectedTenant.createdAt)} />
                     {selectedTenant.requestMessage && (
-                      <View style={styles.messageBox}>
-                        <Text style={styles.messageLabel}>{isVi ? 'Lời nhắn' : 'Message'}</Text>
-                        <Text style={styles.messageText}>"{selectedTenant.requestMessage}"</Text>
+                      <View style={[styles.messageBox, { paddingVertical: sz(10) }]}>
+                        <Text style={[styles.messageLabel, { fontSize: fs(12), marginBottom: sz(6) }]}>{isVi ? 'Lời nhắn' : 'Message'}</Text>
+                        <Text style={[styles.messageText, { fontSize: fs(13), lineHeight: fs(20) }]}>"{selectedTenant.requestMessage}"</Text>
                       </View>
                     )}
                   </View>
@@ -487,18 +489,18 @@ export default function StaffOrganizationsScreen() {
 
                 {/* Review Info */}
                 {(selectedTenant.reviewedAt || selectedTenant.rejectionReason) && (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>
-                      <Ionicons name="shield-checkmark" size={15} color="#10b981" /> {isVi ? 'Thông tin duyệt' : 'Review Information'}
+                  <View style={[styles.section, { marginBottom: sz(16) }]}>
+                    <Text style={[styles.sectionTitle, { fontSize: fs(14), marginBottom: sz(10), letterSpacing: sz(0.3) }]}>
+                      <Ionicons name="shield-checkmark" size={sz(15)} color="#10b981" /> {isVi ? 'Thông tin duyệt' : 'Review Information'}
                     </Text>
-                    <View style={styles.infoCard}>
+                    <View style={[styles.infoCard, { paddingHorizontal: sz(14), borderRadius: sz(14) }]}>
                       {selectedTenant.approvedByName && <InfoRow label={isVi ? 'Người duyệt' : 'Approved By'} value={selectedTenant.approvedByName} />}
                       {selectedTenant.rejectedByName && <InfoRow label={isVi ? 'Người từ chối' : 'Rejected By'} value={selectedTenant.rejectedByName} />}
                       {selectedTenant.reviewedAt && <InfoRow label={isVi ? 'Ngày duyệt' : 'Reviewed At'} value={formatDate(selectedTenant.reviewedAt)} />}
                       {selectedTenant.rejectionReason && (
-                        <View style={styles.messageBox}>
-                          <Text style={styles.messageLabel}>{isVi ? 'Lý do từ chối' : 'Rejection Reason'}</Text>
-                          <Text style={styles.messageText}>{selectedTenant.rejectionReason}</Text>
+                        <View style={[styles.messageBox, { paddingVertical: sz(10) }]}>
+                          <Text style={[styles.messageLabel, { fontSize: fs(12), marginBottom: sz(6) }]}>{isVi ? 'Lý do từ chối' : 'Rejection Reason'}</Text>
+                          <Text style={[styles.messageText, { fontSize: fs(13), lineHeight: fs(20) }]}>{selectedTenant.rejectionReason}</Text>
                         </View>
                       )}
                     </View>
@@ -507,9 +509,9 @@ export default function StaffOrganizationsScreen() {
 
                 {/* Login Info Notice */}
                 {selectedTenant.status === 'ACTIVE' && (
-                  <View style={styles.loginInfoNotice}>
-                    <Ionicons name="mail-outline" size={20} color="#3b82f6" />
-                    <Text style={styles.loginInfoText}>
+                  <View style={[styles.loginInfoNotice, { padding: sz(14), borderRadius: sz(12), gap: sz(10) }]}>
+                    <Ionicons name="mail-outline" size={sz(20)} color="#3b82f6" />
+                    <Text style={[styles.loginInfoText, { fontSize: fs(13), lineHeight: fs(18) }]}>
                       {isVi ? 'Thông tin đăng nhập đã được gửi qua email đến' : 'Login credentials have been sent via email to'}
                       {' '}{selectedTenant.contactEmail}
                     </Text>
@@ -521,22 +523,22 @@ export default function StaffOrganizationsScreen() {
 
           {/* Modal Actions */}
           {selectedTenant && (
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { padding: sz(16), gap: sz(12) }]}>
               {selectedTenant.status === 'PENDING' && (
                 <>
                   <TouchableOpacity
-                    style={styles.actionRejectLarge}
+                    style={[styles.actionRejectLarge, { paddingVertical: sz(14), borderRadius: sz(12), gap: sz(6) }]}
                     onPress={() => {
                       setDetailModalOpen(false);
                       openRejectModal(selectedTenant.id);
                     }}
                     disabled={processing === selectedTenant.id}
                   >
-                    <Ionicons name="close-circle" size={20} color="#f87171" />
-                    <Text style={styles.actionRejectLargeText}>{isVi ? 'Từ chối' : 'Reject'}</Text>
+                    <Ionicons name="close-circle" size={sz(20)} color="#f87171" />
+                    <Text style={[styles.actionRejectLargeText, { fontSize: fs(14) }]}>{isVi ? 'Từ chối' : 'Reject'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.actionApproveLarge, processing === selectedTenant.id && styles.actionDisabled]}
+                    style={[styles.actionApproveLarge, { paddingVertical: sz(14), borderRadius: sz(12), gap: sz(6) }]}
                     onPress={() => openApproveConfirm(selectedTenant.id)}
                     disabled={processing === selectedTenant.id}
                   >
@@ -544,8 +546,8 @@ export default function StaffOrganizationsScreen() {
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
                       <>
-                        <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                        <Text style={styles.actionApproveLargeText}>{isVi ? 'Duyệt tổ chức' : 'Approve'}</Text>
+                        <Ionicons name="checkmark-circle" size={sz(20)} color="#fff" />
+                        <Text style={[styles.actionApproveLargeText, { fontSize: fs(14) }]}>{isVi ? 'Duyệt tổ chức' : 'Approve'}</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -554,7 +556,7 @@ export default function StaffOrganizationsScreen() {
               {selectedTenant.status === 'ACTIVE' && (
                 <>
                   <TouchableOpacity
-                    style={styles.actionResend}
+                    style={[styles.actionResend, { paddingVertical: sz(14), borderRadius: sz(12), gap: sz(6) }]}
                     onPress={() => openResendConfirm(selectedTenant.id)}
                     disabled={processing === selectedTenant.id}
                   >
@@ -562,25 +564,25 @@ export default function StaffOrganizationsScreen() {
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
                       <>
-                        <Ionicons name="mail-outline" size={20} color="#fff" />
-                        <Text style={styles.actionResendText}>{isVi ? 'Gửi lại thông tin' : 'Resend Credentials'}</Text>
+                        <Ionicons name="mail-outline" size={sz(20)} color="#fff" />
+                        <Text style={[styles.actionResendText, { fontSize: fs(14) }]}>{isVi ? 'Gửi lại thông tin' : 'Resend Credentials'}</Text>
                       </>
                     )}
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.actionSuspendLarge}
+                    style={[styles.actionSuspendLarge, { paddingVertical: sz(14), borderRadius: sz(12), gap: sz(6) }]}
                     onPress={() => openSuspendConfirm(selectedTenant.id)}
                     disabled={processing === selectedTenant.id}
                   >
-                    <Ionicons name="pause-circle" size={20} color="#f87171" />
-                    <Text style={styles.actionSuspendLargeText}>{isVi ? 'Tạm ngưng' : 'Suspend'}</Text>
+                    <Ionicons name="pause-circle" size={sz(20)} color="#f87171" />
+                    <Text style={[styles.actionSuspendLargeText, { fontSize: fs(14) }]}>{isVi ? 'Tạm ngưng' : 'Suspend'}</Text>
                   </TouchableOpacity>
                 </>
               )}
               {selectedTenant.status === 'SUSPENDED' && (
                 <>
                   <TouchableOpacity
-                    style={styles.actionActivateLarge}
+                    style={[styles.actionActivateLarge, { paddingVertical: sz(14), borderRadius: sz(12), gap: sz(6) }]}
                     onPress={() => handleActivate(selectedTenant.id)}
                     disabled={processing === selectedTenant.id}
                   >
@@ -588,8 +590,8 @@ export default function StaffOrganizationsScreen() {
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
                       <>
-                        <Ionicons name="play-circle" size={20} color="#fff" />
-                        <Text style={styles.actionActivateLargeText}>{isVi ? 'Kích hoạt lại' : 'Activate'}</Text>
+                        <Ionicons name="play-circle" size={sz(20)} color="#fff" />
+                        <Text style={[styles.actionActivateLargeText, { fontSize: fs(14) }]}>{isVi ? 'Kích hoạt lại' : 'Activate'}</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -608,15 +610,15 @@ export default function StaffOrganizationsScreen() {
         onRequestClose={() => setShowRejectModal(false)}
       >
         <View style={styles.rejectModalOverlay}>
-          <View style={styles.rejectModalContent}>
-            <View style={styles.rejectModalHeader}>
-              <Text style={styles.rejectModalTitle}>{isVi ? 'Lý do từ chối' : 'Rejection Reason'}</Text>
+          <View style={[styles.rejectModalContent, { padding: sz(20), borderRadius: sz(16) }]}>
+            <View style={[styles.rejectModalHeader, { marginBottom: sz(16) }]}>
+              <Text style={[styles.rejectModalTitle, { fontSize: fs(18) }]}>{isVi ? 'Lý do từ chối' : 'Rejection Reason'}</Text>
               <TouchableOpacity onPress={() => setShowRejectModal(false)}>
-                <Ionicons name="close" size={22} color="#f1f5f9" />
+                <Ionicons name="close" size={sz(22)} color="#f1f5f9" />
               </TouchableOpacity>
             </View>
             <TextInput
-              style={styles.rejectInput}
+              style={[styles.rejectInput, { padding: sz(14), fontSize: fs(15), borderRadius: sz(12), minHeight: sz(100), marginBottom: sz(16) }]}
               placeholder={isVi ? 'Nhập lý do từ chối (tùy chọn)' : 'Enter rejection reason (optional)'}
               placeholderTextColor="#64748b"
               value={rejectReason}
@@ -625,22 +627,22 @@ export default function StaffOrganizationsScreen() {
               numberOfLines={4}
               textAlignVertical="top"
             />
-            <View style={styles.rejectModalActions}>
+            <View style={[styles.rejectModalActions, { gap: sz(12) }]}>
               <TouchableOpacity
-                style={styles.rejectCancelBtn}
+                style={[styles.rejectCancelBtn, { paddingVertical: sz(14), borderRadius: sz(12) }]}
                 onPress={() => setShowRejectModal(false)}
               >
-                <Text style={styles.rejectCancelText}>{isVi ? 'Hủy' : 'Cancel'}</Text>
+                <Text style={[styles.rejectCancelText, { fontSize: fs(14) }]}>{isVi ? 'Hủy' : 'Cancel'}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.rejectConfirmBtn}
+                style={[styles.rejectConfirmBtn, { paddingVertical: sz(14), borderRadius: sz(12) }]}
                 onPress={handleReject}
                 disabled={processing === pendingTenantId}
               >
                 {processing === pendingTenantId ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={styles.rejectConfirmText}>{isVi ? 'Xác nhận từ chối' : 'Confirm Reject'}</Text>
+                  <Text style={[styles.rejectConfirmText, { fontSize: fs(14) }]}>{isVi ? 'Xác nhận từ chối' : 'Confirm Reject'}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -714,117 +716,121 @@ export default function StaffOrganizationsScreen() {
         buttonText={isVi ? 'Đóng' : 'Close'}
         onClose={() => setShowErrorModal(false)}
       />
+
+      {/* InfoRow component - defined inline to access responsive hooks */}
+      {null}
     </AppShell>
   );
-}
 
-function InfoRow({ label, value, isLink }: { label: string; value: string; isLink?: boolean }) {
-  return (
-    <View style={infoStyles.row}>
-      <Text style={infoStyles.label}>{label}</Text>
-      <Text style={[infoStyles.value, isLink && infoStyles.link]} numberOfLines={2}>{value}</Text>
-    </View>
-  );
+  // InfoRow component defined at end of function to access responsive hooks
+  function InfoRow({ label, value, isLink }: { label: string; value: string; isLink?: boolean }) {
+    return (
+      <View style={[infoStyles.row, { paddingVertical: sz(8) }]}>
+        <Text style={[infoStyles.label, { fontSize: fs(13) }]}>{label}</Text>
+        <Text style={[infoStyles.value, { fontSize: fs(13) }, isLink && infoStyles.link]} numberOfLines={2}>{value}</Text>
+      </View>
+    );
+  }
 }
 
 const infoStyles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(148, 163, 184, 0.1)' },
-  label: { fontSize: 13, color: '#64748b', flex: 1 },
-  value: { fontSize: 13, color: '#f1f5f9', fontWeight: '500', textAlign: 'right', flex: 1 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  label: { color: '#64748b', flex: 1 },
+  value: { color: '#f1f5f9', fontWeight: '500', textAlign: 'right', flex: 1 },
   link: { color: '#3b82f6' },
 });
 
 const styles = StyleSheet.create({
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  loadingText: { color: '#94a3b8', fontSize: 15 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { color: '#94a3b8' },
   
   // Summary
-  summaryRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
-  summaryCard: { flex: 1, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 8, borderRadius: 16 },
-  summaryIconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  summaryValue: { fontSize: 22, fontWeight: '700', color: '#f1f5f9' },
-  summaryLabel: { fontSize: 11, color: '#94a3b8', marginTop: 2 },
+  summaryRow: { flexDirection: 'row' },
+  summaryCard: { flex: 1, alignItems: 'center' },
+  summaryIconWrap: { alignItems: 'center', justifyContent: 'center' },
+  summaryValue: { fontWeight: '700', color: '#f1f5f9' },
+  summaryLabel: { color: '#94a3b8' },
   
   // List
-  list: { paddingHorizontal: 16, paddingBottom: 20, gap: 12 },
+  list: { flexGrow: 1 },
   
   // Empty
-  emptyCard: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 20 },
-  emptyIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(16, 185, 129, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 2, borderColor: 'rgba(16, 185, 129, 0.2)' },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: '#f1f5f9', marginBottom: 6 },
-  emptySubtitle: { fontSize: 13, color: '#64748b', textAlign: 'center' },
+  emptyCard: { alignItems: 'center' },
+  emptyIconWrap: { backgroundColor: 'rgba(16, 185, 129, 0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(16, 185, 129, 0.2)' },
+  emptyTitle: { fontWeight: '700', color: '#f1f5f9' },
+  emptySubtitle: { color: '#64748b', textAlign: 'center' },
   
   // Card
-  card: { backgroundColor: '#1e293b', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#334155', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  cardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  cardIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  card: { backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  cardIcon: { alignItems: 'center', justifyContent: 'center' },
   cardTitleGroup: { flex: 1 },
-  cardTitle: { fontSize: 15, fontWeight: '600', color: '#f1f5f9', letterSpacing: 0.2 },
-  cardEmail: { fontSize: 12, color: '#64748b', marginTop: 3 },
-  statusPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  statusPillText: { fontSize: 11, fontWeight: '600' },
+  cardTitle: { fontWeight: '600', color: '#f1f5f9' },
+  cardEmail: { color: '#64748b' },
+  statusPill: {},
+  statusPillText: { fontWeight: '600' },
   
   // Representative
-  repRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 6 },
-  repItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  repSep: { color: '#64748b', fontSize: 12 },
-  repText: { fontSize: 12, color: '#94a3b8' },
+  repRow: { flexDirection: 'row', alignItems: 'center' },
+  repItem: { flexDirection: 'row', alignItems: 'center' },
+  repSep: { color: '#64748b' },
+  repText: { color: '#94a3b8' },
   
   // Card Footer
-  cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#334155' },
-  actionReject: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: 'rgba(248, 113, 113, 0.12)' },
-  actionRejectText: { fontSize: 13, color: '#f87171', fontWeight: '600' },
-  actionApprove: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 10, borderRadius: 10, backgroundColor: '#10b981' },
-  actionApproveText: { fontSize: 13, color: '#fff', fontWeight: '600' },
+  cardFooter: { flexDirection: 'row', alignItems: 'center' },
+  actionReject: { flexDirection: 'row', alignItems: 'center' },
+  actionRejectText: { color: '#f87171', fontWeight: '600' },
+  actionApprove: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#10b981' },
+  actionApproveText: { color: '#fff', fontWeight: '600' },
   actionDisabled: { opacity: 0.6 },
-  viewDetailRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
-  viewDetailText: { fontSize: 13, color: '#10b981', fontWeight: '500' },
+  viewDetailRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
+  viewDetailText: { color: '#10b981', fontWeight: '500' },
   
   // Modal
   modalWrap: { flex: 1, backgroundColor: '#0f172a' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#1e293b' },
-  modalHeaderTitle: { fontSize: 18, fontWeight: '700', color: '#f1f5f9', letterSpacing: 0.3 },
-  modalCloseBtn: { padding: 4 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#1e293b' },
+  modalHeaderTitle: { fontWeight: '700', color: '#f1f5f9' },
+  modalCloseBtn: {},
   modalScroll: { flex: 1 },
-  modalScrollContent: { padding: 16, paddingBottom: 32 },
+  modalScrollContent: {},
   
-  statusBanner: { marginBottom: 16 },
-  statusBannerInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12 },
-  statusBannerText: { fontSize: 15, fontWeight: '700' },
+  statusBanner: {},
+  statusBannerInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  statusBannerText: { fontWeight: '700' },
   
-  section: { marginBottom: 16 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#10b981', marginBottom: 10, letterSpacing: 0.3 },
-  infoCard: { backgroundColor: '#1e293b', borderRadius: 14, paddingHorizontal: 14, borderWidth: 1, borderColor: '#334155' },
-  messageBox: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: 'rgba(148, 163, 184, 0.1)' },
-  messageLabel: { fontSize: 12, color: '#64748b', marginBottom: 6 },
-  messageText: { fontSize: 13, color: '#f1f5f9', fontStyle: 'italic', lineHeight: 20 },
+  section: {},
+  sectionTitle: { fontWeight: '700', color: '#10b981' },
+  infoCard: { backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155' },
+  messageBox: { borderTopWidth: 1, borderTopColor: 'rgba(148, 163, 184, 0.1)' },
+  messageLabel: { color: '#64748b' },
+  messageText: { color: '#f1f5f9', fontStyle: 'italic' },
 
-  loginInfoNotice: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.2)' },
-  loginInfoText: { flex: 1, fontSize: 13, color: '#93c5fd', lineHeight: 18 },
+  loginInfoNotice: { flexDirection: 'row', alignItems: 'center' },
+  loginInfoText: { flex: 1, color: '#93c5fd' },
   
   // Modal Actions
-  modalActions: { flexDirection: 'row', gap: 12, padding: 16, borderTopWidth: 1, borderTopColor: '#1e293b' },
-  actionRejectLarge: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12, backgroundColor: 'rgba(248, 113, 113, 0.12)', borderWidth: 1, borderColor: 'rgba(248, 113, 113, 0.2)' },
-  actionRejectLargeText: { fontSize: 14, color: '#f87171', fontWeight: '600' },
-  actionApproveLarge: { flex: 1.4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12, backgroundColor: '#10b981' },
-  actionApproveLargeText: { fontSize: 14, color: '#fff', fontWeight: '600' },
-  actionResend: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12, backgroundColor: '#3b82f6' },
-  actionResendText: { fontSize: 14, color: '#fff', fontWeight: '600' },
-  actionSuspendLarge: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12, backgroundColor: 'rgba(248, 113, 113, 0.12)', borderWidth: 1, borderColor: 'rgba(248, 113, 113, 0.2)' },
-  actionSuspendLargeText: { fontSize: 14, color: '#f87171', fontWeight: '600' },
-  actionActivateLarge: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12, backgroundColor: '#10b981' },
-  actionActivateLargeText: { fontSize: 14, color: '#fff', fontWeight: '600' },
+  modalActions: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#1e293b' },
+  actionRejectLarge: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  actionRejectLargeText: { color: '#f87171', fontWeight: '600' },
+  actionApproveLarge: { flex: 1.4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#10b981' },
+  actionApproveLargeText: { color: '#fff', fontWeight: '600' },
+  actionResend: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#3b82f6' },
+  actionResendText: { color: '#fff', fontWeight: '600' },
+  actionSuspendLarge: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  actionSuspendLargeText: { color: '#f87171', fontWeight: '600' },
+  actionActivateLarge: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#10b981' },
+  actionActivateLargeText: { color: '#fff', fontWeight: '600' },
 
   // Reject Modal
-  rejectModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  rejectModalContent: { backgroundColor: '#1e293b', borderRadius: 16, padding: 20, width: '100%', maxWidth: 400 },
-  rejectModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  rejectModalTitle: { fontSize: 18, fontWeight: '700', color: '#f1f5f9' },
-  rejectInput: { backgroundColor: '#0f172a', borderRadius: 12, padding: 14, fontSize: 15, color: '#f1f5f9', minHeight: 100, textAlignVertical: 'top', marginBottom: 16, borderWidth: 1, borderColor: '#334155' },
-  rejectModalActions: { flexDirection: 'row', gap: 12 },
-  rejectCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: '#334155', alignItems: 'center' },
-  rejectCancelText: { fontSize: 14, color: '#94a3b8', fontWeight: '600' },
-  rejectConfirmBtn: { flex: 1.5, paddingVertical: 14, borderRadius: 12, backgroundColor: '#f87171', alignItems: 'center' },
-  rejectConfirmText: { fontSize: 14, color: '#fff', fontWeight: '600' },
+  rejectModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
+  rejectModalContent: { backgroundColor: '#1e293b', width: '100%', maxWidth: 400 },
+  rejectModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  rejectModalTitle: { fontWeight: '700', color: '#f1f5f9' },
+  rejectInput: { backgroundColor: '#0f172a', color: '#f1f5f9', textAlignVertical: 'top', borderWidth: 1, borderColor: '#334155' },
+  rejectModalActions: { flexDirection: 'row' },
+  rejectCancelBtn: { flex: 1, borderRadius: 12, backgroundColor: '#334155', alignItems: 'center' },
+  rejectCancelText: { color: '#94a3b8', fontWeight: '600' },
+  rejectConfirmBtn: { flex: 1.5, borderRadius: 12, backgroundColor: '#f87171', alignItems: 'center' },
+  rejectConfirmText: { color: '#fff', fontWeight: '600' },
 });

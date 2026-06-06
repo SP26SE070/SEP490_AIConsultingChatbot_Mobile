@@ -12,19 +12,12 @@ export default function RootLayout() {
         <NotificationProvider>
           <StatusBar style="light" />
           <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
             <Stack.Screen name="splash" />
-            <Stack.Screen name="login" />
-            <Stack.Screen name="register" />
-            <Stack.Screen name="change-password" />
-            <Stack.Screen name="chatbot" />
-            <Stack.Screen name="history" />
-            <Stack.Screen name="documents" />
-            <Stack.Screen name="analytics" />
-            <Stack.Screen name="profile" />
-            <Stack.Screen name="admin/employees" />
-            <Stack.Screen name="admin/subscription" />
-            <Stack.Screen name="admin/ai-settings" />
-            <Stack.Screen name="admin/organization-settings" />
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="staff" />
+            <Stack.Screen name="admin" />
           </Stack>
         </NotificationProvider>
       </SafeAreaProvider>

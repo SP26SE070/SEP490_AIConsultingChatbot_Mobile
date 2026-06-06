@@ -49,9 +49,11 @@ const ADMIN_NAV: NavItem[] = [
 
 interface AppSidebarProps {
   onNavigate?: () => void;
+  /** Adaptive sidebar width — passed from AppShell */
+  sidebarWidth?: number;
 }
 
-export function AppSidebar({ onNavigate }: AppSidebarProps) {
+export function AppSidebar({ onNavigate, sidebarWidth = 280 }: AppSidebarProps) {
   const pathname = usePathname();
   const { language } = useLanguageStore();
   const t = translations[language];
@@ -136,7 +138,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
 
   if (isLoading) {
     return (
-      <View style={styles.sidebar}>
+      <View style={[styles.sidebar, { width: sidebarWidth }]}>
         <View style={styles.loading}>
           <Ionicons name="sync-outline" size={24} color="#64748b" />
         </View>
@@ -144,13 +146,21 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
     );
   }
 
+  // Scale padding/icon sizes based on sidebar width
+  const padH   = sidebarWidth < 260 ? 12 : 16;
+  const logoSz  = sidebarWidth < 260 ? 40 : 48;
+  const logoRad = sidebarWidth < 260 ? 12 : 14;
+  const iconSz  = sidebarWidth < 260 ? 18 : 22;
+  const btnPadV = sidebarWidth < 260 ? 10 : 14;
+  const footerPad = sidebarWidth < 260 ? 12 : 16;
+
   return (
-    <View style={styles.sidebar}>
+    <View style={[styles.sidebar, { width: sidebarWidth }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingHorizontal: padH, paddingBottom: padH }]}>
         <View style={styles.logoRow}>
-          <View style={styles.logoWrap}>
-            <AppLogo size={36} />
+          <View style={[styles.logoWrap, { width: logoSz, height: logoSz, borderRadius: logoRad }]}>
+            <AppLogo size={iconSz} />
           </View>
           <View style={styles.headerText}>
             <Text style={styles.appTitle}>{t.appTitle}</Text>
@@ -226,9 +236,9 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
           <>
             {/* New Chat Button - Only for employee */}
             {userRole === 'employee' && (
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={handleNewChat}
+            <TouchableOpacity
+              style={[styles.actionBtn, { paddingVertical: btnPadV }]}
+              onPress={handleNewChat}
                 activeOpacity={0.85}
               >
                 <Ionicons name="add-circle" size={22} color="#fff" />
@@ -274,9 +284,9 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
       </ScrollView>
 
       {/* Footer - Logout only */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { padding: footerPad }]}>
         <TouchableOpacity
-          style={styles.logoutBtn}
+          style={[styles.logoutBtn, { paddingVertical: btnPadV, paddingHorizontal: padH }]}
           onPress={handleLogout}
           activeOpacity={0.8}
         >
@@ -301,9 +311,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   header: {
-    paddingHorizontal: 16,
     paddingTop: 20,
-    paddingBottom: 16,
     gap: 12,
   },
   logoRow: {
@@ -312,12 +320,9 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   logoWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },

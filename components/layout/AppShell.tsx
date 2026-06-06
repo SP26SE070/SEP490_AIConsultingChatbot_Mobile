@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, LAYOUT } from '../../lib/theme';
 import { AppSidebar } from './AppSidebar';
 import { HeaderDropdown } from '../HeaderDropdown';
+import { useResponsive } from '../../lib/useResponsive';
 
 interface AppShellProps {
   title: string;
@@ -21,11 +22,18 @@ interface AppShellProps {
   headerRight?: ReactNode;
 }
 
+function getAdaptiveSidebarWidth(width: number): number {
+  if (width < 400) return Math.round(width * 0.8);
+  if (width < 600) return Math.round(width * 0.75);
+  return LAYOUT.sidebarWidth;
+}
+
 export function AppShell({ title, subtitle, children, headerRight }: AppShellProps) {
-  const { width } = useWindowDimensions();
+  const { width, sz, fs } = useResponsive();
   const isTablet = width >= LAYOUT.tabletBreakpoint;
+  const sidebarWidth = getAdaptiveSidebarWidth(width);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const slideAnim = useRef(new Animated.Value(-LAYOUT.sidebarWidth)).current;
+  const slideAnim = useRef(new Animated.Value(-sidebarWidth)).current;
 
   useEffect(() => {
     if (isTablet) {
@@ -33,11 +41,11 @@ export function AppShell({ title, subtitle, children, headerRight }: AppShellPro
       return;
     }
     Animated.timing(slideAnim, {
-      toValue: drawerOpen ? 0 : -LAYOUT.sidebarWidth,
+      toValue: drawerOpen ? 0 : -sidebarWidth,
       duration: 250,
       useNativeDriver: false,
     }).start();
-  }, [drawerOpen, isTablet, slideAnim]);
+  }, [drawerOpen, isTablet, slideAnim, sidebarWidth]);
 
   function closeDrawer() {
     setDrawerOpen(false);
@@ -47,14 +55,19 @@ export function AppShell({ title, subtitle, children, headerRight }: AppShellPro
     setDrawerOpen(true);
   }
 
+  const topBarPadH = width < 375 ? sz(12) : width < 414 ? sz(14) : sz(16);
+  const topBarPadV = width < 375 ? sz(10) : sz(12);
+  const menuBtnSz = width < 375 ? sz(36) : sz(42);
+  const titleFS = width < 375 ? fs(17) : width >= 600 ? fs(22) : fs(20);
+
   return (
     <SafeAreaView style={styles.root} edges={['top', 'right', 'bottom']}>
       <View style={styles.row}>
         {isTablet && (
-          <View style={styles.sidebarContainer}>
+          <View style={[styles.sidebarContainer, { width: sidebarWidth }]}>
             <SafeAreaView style={styles.sidebarSafe} edges={['top', 'bottom', 'left']}>
               <View style={styles.sidebarInner}>
-                <AppSidebar onNavigate={closeDrawer} />
+                <AppSidebar onNavigate={closeDrawer} sidebarWidth={sidebarWidth} />
               </View>
             </SafeAreaView>
           </View>
@@ -68,31 +81,31 @@ export function AppShell({ title, subtitle, children, headerRight }: AppShellPro
           <Animated.View
             style={[
               styles.drawer,
-              { width: LAYOUT.sidebarWidth, transform: [{ translateX: slideAnim }] },
+              { width: sidebarWidth, transform: [{ translateX: slideAnim }] },
             ]}
           >
             <SafeAreaView style={styles.sidebarSafe} edges={['top', 'bottom', 'left']}>
               <View style={styles.sidebarInner}>
-                <AppSidebar onNavigate={closeDrawer} />
+                <AppSidebar onNavigate={closeDrawer} sidebarWidth={sidebarWidth} />
               </View>
             </SafeAreaView>
           </Animated.View>
         )}
 
         <View style={styles.main}>
-          <View style={styles.topBar}>
+          <View style={[styles.topBar, { paddingHorizontal: topBarPadH, paddingVertical: topBarPadV }]}>
             <View style={styles.topBarLeft}>
               {!isTablet && (
                 <TouchableOpacity
-                  style={styles.menuBtn}
+                  style={[styles.menuBtn, { width: menuBtnSz, height: menuBtnSz }]}
                   onPress={openDrawer}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="menu" size={22} color="#f1f5f9" />
+                  <Ionicons name="menu" size={20} color="#f1f5f9" />
                 </TouchableOpacity>
               )}
               <View style={styles.titleBlock}>
-                <Text style={styles.pageTitle} numberOfLines={1}>{title}</Text>
+                <Text style={[styles.pageTitle, { fontSize: titleFS }]} numberOfLines={1}>{title}</Text>
                 {subtitle ? (
                   <Text style={styles.pageSubtitle} numberOfLines={1}>{subtitle}</Text>
                 ) : null}
@@ -114,17 +127,16 @@ export function AppShell({ title, subtitle, children, headerRight }: AppShellPro
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: COLORS.bg,
   },
   row: {
     flex: 1,
     flexDirection: 'row',
   },
   sidebarContainer: {
-    width: LAYOUT.sidebarWidth,
     flexShrink: 0,
     borderRightWidth: 1,
-    borderRightColor: '#1e293b',
+    borderRightColor: COLORS.surface,
   },
   sidebarSafe: {
     flex: 1,
@@ -158,11 +170,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-    backgroundColor: '#0f172a',
+    borderBottomColor: COLORS.surface,
+    backgroundColor: COLORS.bg,
   },
   topBarLeft: {
     flexDirection: 'row',
@@ -172,27 +182,23 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   menuBtn: {
-    width: 42,
-    height: 42,
     borderRadius: 12,
-    backgroundColor: '#1e293b',
+    backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: COLORS.surfaceLight,
   },
   titleBlock: {
     flex: 1,
     minWidth: 0,
   },
   pageTitle: {
-    fontSize: 20,
     fontWeight: '700',
-    color: '#f1f5f9',
+    color: COLORS.text,
   },
   pageSubtitle: {
-    fontSize: 13,
-    color: '#94a3b8',
+    color: COLORS.textMuted,
     marginTop: 2,
   },
   headerActions: {
@@ -205,6 +211,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: COLORS.bg,
   },
 });

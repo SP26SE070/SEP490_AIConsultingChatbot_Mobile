@@ -11,6 +11,7 @@ import { getAccessToken } from '../../lib/auth-store';
 import { API_BASE_URL } from '../../lib/api/config';
 import { getPaymentHistory, type PaymentHistoryItem, type PaymentStatus } from '../../lib/api/payment';
 import { useNotification } from '../../lib/notification';
+import { useResponsive } from '../../lib/useResponsive';
 
 interface Subscription {
   subscription_id?: string;
@@ -135,9 +136,340 @@ function isPopularPlan(plan: Pick<Plan, 'code' | 'tier' | 'id'>) {
 }
 
 export default function AdminSubscriptionScreen() {
+  const { width, sz, fs } = useResponsive();
   const { language } = useLanguageStore();
   const t = translations[language];
   const { showToast, showSuccess, showError, showInfo, showConfirm } = useNotification();
+
+  // Responsive values
+  const isSmall = width < 375;
+  const tabsPaddingTop = sz(12);
+  const tabPaddingV = sz(12);
+  const tabPaddingH = sz(16);
+  const tabRadius = sz(10);
+  const tabTextSize = fs(14);
+  const contentPadding = sz(16);
+  const contentPaddingBottom = sz(32);
+  
+  // Current Plan Card
+  const currentPlanPadding = sz(20);
+  const currentPlanRadius = sz(20);
+  const planIconWrapSize = sz(56);
+  const planIconRadius = sz(16);
+  const currentPlanNameSize = fs(24);
+  const statusBadgePaddingH = sz(10);
+  const statusBadgePaddingV = sz(4);
+  const statusBadgeRadius = sz(20);
+  const statusTextSize = fs(12);
+  const priceValueSize = fs(32);
+  const pricePeriodSize = fs(16);
+  const trialBadgePaddingH = sz(12);
+  const trialBadgePaddingV = sz(6);
+  const trialBadgeRadius = sz(20);
+  const trialTextSize = fs(12);
+  const currentPlanMetaGap = sz(12);
+  const metaItemGap = sz(10);
+  const metaLabelSize = fs(14);
+  const cancelButtonPaddingV = sz(12);
+  const cancelButtonRadius = sz(10);
+  const cancelButtonTextSize = fs(14);
+  const autoRenewButtonPaddingV = sz(12);
+  const autoRenewButtonRadius = sz(10);
+  const autoRenewButtonTextSize = fs(14);
+  
+  // Limits Card
+  const limitsCardPadding = sz(16);
+  const limitsCardRadius = sz(16);
+  const limitsTitleSize = fs(16);
+  const limitRowGap = sz(10);
+  const limitRowMarginB = sz(8);
+  const limitTextSize = fs(14);
+  
+  // Empty State
+  const emptyIconSize = sz(80);
+  const emptyIconRadius = sz(40);
+  const emptyTitleSize = fs(20);
+  const emptySubtitleSize = fs(14);
+  const selectPlanBtnPaddingH = sz(24);
+  const selectPlanBtnPaddingV = sz(14);
+  const selectPlanBtnRadius = sz(12);
+  const selectPlanBtnTextSize = fs(15);
+  
+  // Plans
+  const plansPadding = sz(16);
+  const cycleRowGap = sz(10);
+  const cycleChipPaddingH = sz(16);
+  const cycleChipPaddingV = sz(10);
+  const cycleChipRadius = sz(12);
+  const cycleChipTextSize = fs(14);
+  const planCardPadding = sz(20);
+  const planCardRadius = sz(20);
+  const popularBadgePaddingH = sz(12);
+  const popularBadgePaddingV = sz(6);
+  const popularBadgeRadius = sz(20);
+  const popularBadgeTextSize = fs(11);
+  const planNameSize = fs(28);
+  const planPriceSize = fs(32);
+  const planPeriodSize = fs(14);
+  const planDescTextSize = fs(14);
+  const planDescLineHeight = fs(20);
+  const planFeatureRowGap = sz(8);
+  const planFeatureBulletSize = fs(16);
+  const planFeatureBulletLineHeight = fs(20);
+  const planFeatureTextSize = fs(14);
+  const planFeatureLineHeight = fs(20);
+  
+  // Confirm Modal
+  const confirmOverlayPadding = sz(20);
+  const confirmModalPadding = sz(20);
+  const confirmModalRadius = sz(20);
+  const confirmModalTitleSize = fs(18);
+  const confirmModalLabelSize = fs(12);
+  const confirmModalValueSize = fs(16);
+  const confirmModalPriceSize = fs(28);
+  const confirmModalCycleLabelSize = fs(14);
+  const confirmModalActionsGap = sz(10);
+  const confirmModalBtnPaddingV = sz(13);
+  const confirmModalBtnRadius = sz(12);
+  const confirmModalBtnTextSize = fs(14);
+  
+  // Payment
+  const paymentCardPadding = sz(20);
+  const paymentCardRadius = sz(20);
+  const paymentTitleSize = fs(20);
+  const qrContainerPadding = sz(20);
+  const qrContainerRadius = sz(16);
+  const qrImageSize = sz(200);
+  const qrHintSize = fs(13);
+  const paymentInfoGap = sz(16);
+  const paymentRowPaddingB = sz(12);
+  const paymentLabelSize = fs(13);
+  const paymentValueSize = fs(15);
+  const paymentAmountSize = fs(18);
+  const paymentContentPaddingH = sz(12);
+  const paymentContentPaddingV = sz(8);
+  const paymentContentRadius = sz(8);
+  const paymentContentSize = fs(15);
+  const expiresInfoPaddingH = sz(12);
+  const expiresInfoPaddingV = sz(8);
+  const expiresInfoRadius = sz(8);
+  const expiresTextSize = fs(13);
+  const paymentNoteSize = fs(13);
+  const paymentNoteLineHeight = fs(20);
+  const pollingStatusPaddingH = sz(14);
+  const pollingStatusPaddingV = sz(12);
+  const pollingStatusRadius = sz(12);
+  const pollingStatusTextSize = fs(14);
+  
+  // Success Modal
+  const successOverlayPadding = sz(20);
+  const successModalPadding = sz(24);
+  const successModalRadius = sz(24);
+  const successTitleSize = fs(22);
+  const successSubtitleSize = fs(14);
+  const successSubtitleLineHeight = fs(20);
+  const successDetailsPadding = sz(16);
+  const successDetailsRadius = sz(16);
+  const successDetailsRowGap = sz(12);
+  const successDetailLabelSize = fs(13);
+  const successDetailValueSize = fs(14);
+  const successButtonPaddingV = sz(14);
+  const successButtonRadius = sz(14);
+  const successButtonTextSize = fs(15);
+  
+  // History
+  const historyTitleSize = fs(18);
+  const historySubtitleSize = fs(13);
+  const historySubtitleLineHeight = fs(18);
+  const historyCardPadding = sz(16);
+  const historyCardRadius = sz(16);
+  const historyTierBadgePaddingH = sz(10);
+  const historyTierBadgePaddingV = sz(4);
+  const historyTierBadgeRadius = sz(20);
+  const historyTierTextSize = fs(12);
+  const historyStatusBadgePaddingH = sz(10);
+  const historyStatusBadgePaddingV = sz(4);
+  const historyStatusBadgeRadius = sz(20);
+  const historyStatusTextSize = fs(11);
+  const historyAmountSize = fs(24);
+  const historyRowMarginB = sz(8);
+  const historyLabelSize = fs(11);
+  const historyLabelLineHeight = fs(20);
+  const historyValueSize = fs(14);
+
+  const styles = StyleSheet.create({
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
+    loadingText: { color: '#94a3b8', fontSize: 15 },
+
+    tabsScroll: { maxHeight: 56 },
+    tabs: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, gap: 8, paddingBottom: 4 },
+    tab: { paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center', borderRadius: 8, backgroundColor: '#1e293b' },
+    tabActive: { backgroundColor: '#10b981' },
+    tabText: { fontSize: 13, fontWeight: '600', color: '#94a3b8' },
+    tabTextActive: { color: '#fff' },
+
+    content: { flex: 1, backgroundColor: '#0f172a' },
+    contentPadding: { padding: 16, paddingBottom: 24 },
+
+    currentPlanCard: { backgroundColor: '#1e293b', borderRadius: 16, padding: 16, borderWidth: 0, marginBottom: 16 },
+    currentPlanHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+    planIconWrap: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+    currentPlanInfo: { flex: 1 },
+    currentPlanName: { fontSize: 20, fontWeight: '700', color: '#f1f5f9', marginBottom: 6 },
+    statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start' },
+    statusText: { fontSize: 12, fontWeight: '600' },
+
+    currentPlanPrice: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginBottom: 16 },
+    priceValue: { fontSize: 28, fontWeight: '700', color: '#f1f5f9' },
+    pricePeriod: { fontSize: 14, color: '#64748b' },
+
+    trialBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(59, 130, 246, 0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginBottom: 16 },
+    trialText: { fontSize: 12, fontWeight: '600', color: '#3b82f6' },
+
+    currentPlanMeta: { gap: 12, marginBottom: 16 },
+    metaItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    metaLabel: { fontSize: 13, color: '#94a3b8' },
+
+    cancelButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, backgroundColor: 'rgba(248, 113, 113, 0.1)', marginTop: 8 },
+    cancelButtonText: { fontSize: 14, fontWeight: '600', color: '#f87171' },
+
+    autoRenewButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, backgroundColor: 'rgba(148, 163, 184, 0.1)', marginTop: 8 },
+    autoRenewButtonText: { fontSize: 14, fontWeight: '600' },
+
+    limitsCard: { backgroundColor: '#1e293b', borderRadius: 16, padding: 16, marginBottom: 16 },
+    limitsTitle: { fontSize: 16, fontWeight: '600', color: '#f1f5f9', marginBottom: 12 },
+    limitRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+    limitText: { fontSize: 14, color: '#94a3b8' },
+
+    emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+    emptyIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(16, 185, 129, 0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+    emptyTitle: { fontSize: 20, fontWeight: '700', color: '#f1f5f9', marginBottom: 8 },
+    emptySubtitle: { fontSize: 14, color: '#94a3b8', textAlign: 'center', marginBottom: 24 },
+    selectPlanBtn: { backgroundColor: '#10b981', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+    selectPlanBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+
+    plansContainer: { flex: 1, padding: 16, backgroundColor: '#0f172a' },
+    cycleRow: { flexDirection: 'row', gap: 8, marginBottom: 16, justifyContent: 'center' },
+    cycleChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: '#1e293b', borderWidth: 1.5, borderColor: '#334155' },
+    cycleChipActive: { backgroundColor: '#10b981', borderColor: '#10b981' },
+    cycleChipText: { fontSize: 13, fontWeight: '600', color: '#94a3b8' },
+    cycleChipTextActive: { color: '#fff' },
+    plansScroll: { flex: 1 },
+
+    planCard: { backgroundColor: '#1e293b', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 2, borderColor: 'transparent' },
+    planCardPopular: { borderColor: '#34d399' },
+    planCardCurrent: { borderWidth: 2, borderColor: '#22c55e' },
+    planCardSelected: { borderWidth: 2, borderColor: '#10b981' },
+
+    popularBadge: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, zIndex: 1, backgroundColor: '#10b981' },
+    popularBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+    currentBadge: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#22c55e', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, zIndex: 1 },
+    currentBadgeOnPopular: { top: 44 },
+    currentBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+    selectedIndicator: { position: 'absolute', top: 12, right: 12, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+    planHeader: { marginBottom: 16 },
+    planName: { fontSize: 18, fontWeight: '700', color: '#f1f5f9', marginBottom: 8 },
+    planPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
+    planPrice: { fontSize: 24, fontWeight: '700', color: '#64748b' },
+    planPeriod: { fontSize: 14, color: '#94a3b8', fontWeight: '400' },
+
+    planDescriptionText: { fontSize: 14, color: '#94a3b8', marginBottom: 12, lineHeight: 20 },
+    planDescriptionTextSelected: { color: '#e2e8f0' },
+
+    planDescription: { marginBottom: 16, gap: 8 },
+    planFeatureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    planFeatureBullet: { fontSize: 16, lineHeight: 20, color: '#94a3b8', marginRight: -2 },
+    planFeatureBulletSelected: { color: '#f1f5f9' },
+    planFeatureText: { flex: 1, fontSize: 14, color: '#94a3b8', lineHeight: 20 },
+    planFeatureTextSelected: { color: '#f1f5f9' },
+
+    selectAction: { marginTop: 8, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+    selectActionText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+
+    confirmSection: { marginTop: 8, marginBottom: 24 },
+    confirmButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#10b981', paddingVertical: 16, borderRadius: 14 },
+    confirmButtonText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+    confirmNote: { fontSize: 12, color: '#94a3b8', textAlign: 'center', marginTop: 10 },
+
+    confirmOverlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.82)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    confirmModal: { width: '100%', maxWidth: 420, backgroundColor: '#0f172a', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: 'rgba(148, 163, 184, 0.16)' },
+    confirmModalTitle: { fontSize: 20, fontWeight: '700', color: '#f8fafc', marginBottom: 14 },
+    confirmModalLabel: { fontSize: 12, color: '#94a3b8', marginTop: 10, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
+    confirmModalValue: { fontSize: 18, fontWeight: '700', color: '#f8fafc' },
+    confirmModalPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+    confirmModalPrice: { fontSize: 24, fontWeight: '700', color: '#10b981' },
+    confirmModalCycleLabel: { fontSize: 14, color: '#94a3b8' },
+    confirmModalActions: { flexDirection: 'row', gap: 12, marginTop: 18 },
+    confirmWarning: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+      backgroundColor: 'rgba(245, 158, 11, 0.1)',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginTop: 12,
+    },
+    confirmWarningText: {
+      flex: 1,
+      color: '#f59e0b',
+      fontSize: 12,
+      fontWeight: '500',
+      lineHeight: 18,
+    },
+    confirmModalCancel: { flex: 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: '#1e293b' },
+    confirmModalCancelText: { fontSize: 14, fontWeight: '700', color: '#e2e8f0' },
+    confirmModalConfirm: { flex: 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: '#10b981' },
+    confirmModalConfirmText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+
+    paymentCard: { backgroundColor: '#1e293b', borderRadius: 16, padding: 20 },
+    paymentHeader: { alignItems: 'center', marginBottom: 24 },
+    paymentTitle: { fontSize: 18, fontWeight: '700', color: '#f1f5f9', marginTop: 12 },
+    qrContainer: { alignItems: 'center', marginBottom: 24, backgroundColor: '#fff', padding: 16, borderRadius: 12 },
+    qrImage: { width: 180, height: 180 },
+    qrHint: { fontSize: 13, color: '#64748b', marginTop: 12, textAlign: 'center' },
+    paymentInfo: { gap: 12, marginBottom: 20 },
+    paymentRow: { borderBottomWidth: 1, borderBottomColor: 'rgba(148, 163, 184, 0.1)', paddingBottom: 12 },
+    paymentLabel: { fontSize: 13, color: '#64748b', marginBottom: 4 },
+    paymentValue: { fontSize: 14, color: '#f1f5f9', fontWeight: '500' },
+    paymentAmount: { fontSize: 20, color: '#22c55e', fontWeight: '700' },
+    paymentContent: { fontSize: 14, color: '#10b981', fontWeight: '600', backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+    expiresInfo: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(245, 158, 11, 0.1)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginBottom: 16 },
+    expiresText: { fontSize: 13, color: '#f59e0b', fontWeight: '500' },
+    paymentNote: { fontSize: 12, color: '#94a3b8', lineHeight: 18 },
+    pollingStatus: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(245, 158, 11, 0.12)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, marginBottom: 16 },
+    pollingStatusText: { fontSize: 13, color: '#f59e0b', fontWeight: '600' },
+
+    successOverlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    successModal: { width: '100%', maxWidth: 420, backgroundColor: '#0f172a', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)', alignItems: 'center' },
+    successIconWrap: { marginBottom: 16 },
+    successTitle: { fontSize: 22, fontWeight: '700', color: '#f8fafc', textAlign: 'center', marginBottom: 8 },
+    successSubtitle: { fontSize: 14, color: '#94a3b8', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+    successDetails: { width: '100%', backgroundColor: '#1e293b', borderRadius: 12, padding: 16, gap: 12, marginBottom: 20 },
+    successDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+    successDetailLabel: { fontSize: 13, color: '#64748b' },
+    successDetailValue: { fontSize: 14, fontWeight: '600', color: '#f1f5f9', textAlign: 'right', flex: 1 },
+    successButton: { width: '100%', backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+    successButtonText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+
+    historyHeader: { marginBottom: 16 },
+    historyTitle: { fontSize: 18, fontWeight: '700', color: '#f1f5f9', marginBottom: 4 },
+    historySubtitle: { fontSize: 13, color: '#94a3b8', lineHeight: 18 },
+    historyLoading: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12 },
+    historyEmpty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 24, gap: 10 },
+    historyEmptyTitle: { fontSize: 16, fontWeight: '700', color: '#f1f5f9', marginTop: 8 },
+    historyEmptyText: { fontSize: 13, color: '#94a3b8', textAlign: 'center', lineHeight: 20 },
+    historyCard: { backgroundColor: '#1e293b', borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#334155' },
+    historyCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 },
+    historyTierBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+    historyTierText: { fontSize: 11, fontWeight: '700' },
+    historyStatusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+    historyStatusText: { fontSize: 11, fontWeight: '700' },
+    historyAmount: { fontSize: 18, fontWeight: '700', color: '#10b981', marginBottom: 12 },
+    historyRow: { marginBottom: 8 },
+    historyLabel: { fontSize: 11, color: '#64748b', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 },
+    historyValue: { fontSize: 13, color: '#e2e8f0', fontWeight: '500' },
+  });
 
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
@@ -1035,6 +1367,17 @@ export default function AdminSubscriptionScreen() {
               </Text>
             </View>
 
+            {subscription && subscription.status === 'ACTIVE' && !subscription.cancelledAt && (
+              <View style={styles.confirmWarning}>
+                <Ionicons name="information-circle" size={16} color="#f59e0b" />
+                <Text style={styles.confirmWarningText}>
+                  {language === 'vi'
+                    ? 'Gói mới sẽ thay thế gói hiện tại khi thanh toán thành công. Gói cũ vẫn có hiệu lực đến hết kỳ thanh toán.'
+                    : 'New plan will replace the current plan upon successful payment. The old plan remains active until end of billing period.'}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.confirmModalActions}>
               <TouchableOpacity
                 style={styles.confirmModalCancel}
@@ -1229,166 +1572,3 @@ export default function AdminSubscriptionScreen() {
     </AppShell>
   );
 }
-
-const styles = StyleSheet.create({
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  loadingText: { color: '#94a3b8', fontSize: 15 },
-
-  tabsScroll: { maxHeight: 56 },
-  tabs: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, gap: 8, paddingBottom: 4 },
-  tab: { paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', borderRadius: 10, backgroundColor: '#1e293b' },
-  tabActive: { backgroundColor: '#10b981' },
-  tabText: { fontSize: 14, fontWeight: '600', color: '#94a3b8' },
-  tabTextActive: { color: '#fff' },
-
-  content: { flex: 1 },
-  contentPadding: { padding: 16, paddingBottom: 32 },
-
-  // Current Plan Card
-  currentPlanCard: { backgroundColor: '#1e293b', borderRadius: 20, padding: 20, borderWidth: 0, marginBottom: 16 },
-  currentPlanHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
-  planIconWrap: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  currentPlanInfo: { flex: 1 },
-  currentPlanName: { fontSize: 24, fontWeight: '700', color: '#f1f5f9', marginBottom: 6 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, alignSelf: 'flex-start' },
-  statusText: { fontSize: 12, fontWeight: '600' },
-  
-  currentPlanPrice: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginBottom: 16 },
-  priceValue: { fontSize: 32, fontWeight: '700', color: '#f1f5f9' },
-  pricePeriod: { fontSize: 16, color: '#64748b' },
-
-  trialBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(59, 130, 246, 0.12)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 16 },
-  trialText: { fontSize: 12, fontWeight: '600', color: '#3b82f6' },
-
-  currentPlanMeta: { gap: 12, marginBottom: 16 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  metaLabel: { fontSize: 14, color: '#94a3b8' },
-
-  cancelButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 10, backgroundColor: 'rgba(248, 113, 113, 0.1)', marginTop: 8 },
-  cancelButtonText: { fontSize: 14, fontWeight: '600', color: '#f87171' },
-
-  autoRenewButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 10, backgroundColor: 'rgba(148, 163, 184, 0.1)', marginTop: 8 },
-  autoRenewButtonText: { fontSize: 14, fontWeight: '600' },
-
-  // Limits Card
-  limitsCard: { backgroundColor: '#1e293b', borderRadius: 16, padding: 16, marginBottom: 16 },
-  limitsTitle: { fontSize: 16, fontWeight: '600', color: '#f1f5f9', marginBottom: 12 },
-  limitRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  limitText: { fontSize: 14, color: '#94a3b8' },
-
-  // Empty State
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
-  emptyIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(16, 185, 129, 0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#f1f5f9', marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, color: '#94a3b8', textAlign: 'center', marginBottom: 24 },
-  selectPlanBtn: { backgroundColor: '#10b981', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12 },
-  selectPlanBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
-
-  // Plans
-  plansContainer: { flex: 1, padding: 16 },
-  cycleRow: { flexDirection: 'row', gap: 10, marginBottom: 16, justifyContent: 'center' },
-  cycleChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: '#1e293b', borderWidth: 1.5, borderColor: '#334155' },
-  cycleChipActive: { backgroundColor: '#10b981', borderColor: '#10b981' },
-  cycleChipText: { fontSize: 14, fontWeight: '600', color: '#94a3b8' },
-  cycleChipTextActive: { color: '#fff' },
-  plansScroll: { flex: 1 },
-
-  planCard: { backgroundColor: '#1e293b', borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 2, borderColor: 'transparent' },
-  planCardPopular: { borderColor: '#34d399' },
-  planCardCurrent: { borderWidth: 2, borderColor: '#22c55e' },
-  planCardSelected: { borderWidth: 2, borderColor: '#10b981' },
-
-  popularBadge: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, zIndex: 1, backgroundColor: '#10b981' },
-  popularBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
-  currentBadge: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#22c55e', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, zIndex: 1 },
-  currentBadgeOnPopular: { top: 44 },
-  currentBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
-  selectedIndicator: { position: 'absolute', top: 12, right: 12, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  planHeader: { marginBottom: 16 },
-  planName: { fontSize: 28, fontWeight: '700', color: '#f1f5f9', marginBottom: 8 },
-  planPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
-  planPrice: { fontSize: 32, fontWeight: '700', color: '#64748b' },
-  planPeriod: { fontSize: 14, color: '#94a3b8', fontWeight: '400' },
-
-  planDescriptionText: { fontSize: 14, color: '#94a3b8', marginBottom: 12, lineHeight: 20 },
-  planDescriptionTextSelected: { color: '#e2e8f0' },
-
-  planDescription: { marginBottom: 16, gap: 8 },
-  planFeatureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  planFeatureBullet: { fontSize: 16, lineHeight: 20, color: '#94a3b8', marginRight: -2 },
-  planFeatureBulletSelected: { color: '#f1f5f9' },
-  planFeatureText: { flex: 1, fontSize: 14, color: '#94a3b8', lineHeight: 20 },
-  planFeatureTextSelected: { color: '#f1f5f9' },
-
-  selectAction: { marginTop: 8, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  selectActionText: { fontSize: 14, fontWeight: '600', color: '#fff' },
-
-  confirmSection: { marginTop: 8, marginBottom: 24 },
-  confirmButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#10b981', paddingVertical: 16, borderRadius: 14 },
-  confirmButtonText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  confirmNote: { fontSize: 12, color: '#94a3b8', textAlign: 'center', marginTop: 10 },
-
-  // Confirm Modal
-  confirmOverlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.82)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  confirmModal: { width: '100%', maxWidth: 420, backgroundColor: '#0f172a', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: 'rgba(148, 163, 184, 0.16)' },
-  confirmModalTitle: { fontSize: 18, fontWeight: '700', color: '#f8fafc', marginBottom: 14 },
-  confirmModalLabel: { fontSize: 12, color: '#94a3b8', marginTop: 10, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
-  confirmModalValue: { fontSize: 16, fontWeight: '700', color: '#f8fafc' },
-  confirmModalPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  confirmModalPrice: { fontSize: 28, fontWeight: '700', color: '#10b981' },
-  confirmModalCycleLabel: { fontSize: 14, color: '#94a3b8' },
-  confirmModalActions: { flexDirection: 'row', gap: 10, marginTop: 18 },
-  confirmModalCancel: { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', backgroundColor: '#1e293b' },
-  confirmModalCancelText: { fontSize: 14, fontWeight: '700', color: '#e2e8f0' },
-  confirmModalConfirm: { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', backgroundColor: '#10b981' },
-  confirmModalConfirmText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-
-  // Payment
-  paymentCard: { backgroundColor: '#1e293b', borderRadius: 20, padding: 20 },
-  paymentHeader: { alignItems: 'center', marginBottom: 24 },
-  paymentTitle: { fontSize: 20, fontWeight: '700', color: '#f1f5f9', marginTop: 12 },
-  qrContainer: { alignItems: 'center', marginBottom: 24, backgroundColor: '#fff', padding: 20, borderRadius: 16 },
-  qrImage: { width: 200, height: 200 },
-  qrHint: { fontSize: 13, color: '#64748b', marginTop: 12, textAlign: 'center' },
-  paymentInfo: { gap: 16, marginBottom: 20 },
-  paymentRow: { borderBottomWidth: 1, borderBottomColor: 'rgba(148, 163, 184, 0.1)', paddingBottom: 12 },
-  paymentLabel: { fontSize: 13, color: '#64748b', marginBottom: 4 },
-  paymentValue: { fontSize: 15, color: '#f1f5f9', fontWeight: '500' },
-  paymentAmount: { fontSize: 18, color: '#22c55e', fontWeight: '700' },
-  paymentContent: { fontSize: 15, color: '#10b981', fontWeight: '600', backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  expiresInfo: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(245, 158, 11, 0.1)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginBottom: 16 },
-  expiresText: { fontSize: 13, color: '#f59e0b', fontWeight: '500' },
-  paymentNote: { fontSize: 13, color: '#94a3b8', lineHeight: 20 },
-  pollingStatus: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(245, 158, 11, 0.12)', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, marginBottom: 16 },
-  pollingStatusText: { fontSize: 14, color: '#f59e0b', fontWeight: '600' },
-
-  successOverlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  successModal: { width: '100%', maxWidth: 420, backgroundColor: '#0f172a', borderRadius: 24, padding: 24, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)', alignItems: 'center' },
-  successIconWrap: { marginBottom: 16 },
-  successTitle: { fontSize: 22, fontWeight: '700', color: '#f8fafc', textAlign: 'center', marginBottom: 8 },
-  successSubtitle: { fontSize: 14, color: '#94a3b8', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
-  successDetails: { width: '100%', backgroundColor: '#1e293b', borderRadius: 16, padding: 16, gap: 12, marginBottom: 20 },
-  successDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  successDetailLabel: { fontSize: 13, color: '#64748b' },
-  successDetailValue: { fontSize: 14, fontWeight: '600', color: '#f1f5f9', textAlign: 'right', flex: 1 },
-  successButton: { width: '100%', backgroundColor: '#10b981', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
-  successButtonText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-
-  historyHeader: { marginBottom: 16 },
-  historyTitle: { fontSize: 18, fontWeight: '700', color: '#f1f5f9', marginBottom: 4 },
-  historySubtitle: { fontSize: 13, color: '#94a3b8', lineHeight: 18 },
-  historyLoading: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12 },
-  historyEmpty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 24, gap: 10 },
-  historyEmptyTitle: { fontSize: 16, fontWeight: '700', color: '#f1f5f9', marginTop: 8 },
-  historyEmptyText: { fontSize: 13, color: '#94a3b8', textAlign: 'center', lineHeight: 20 },
-  historyCard: { backgroundColor: '#1e293b', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#334155' },
-  historyCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 },
-  historyTierBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  historyTierText: { fontSize: 12, fontWeight: '700' },
-  historyStatusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  historyStatusText: { fontSize: 11, fontWeight: '700' },
-  historyAmount: { fontSize: 24, fontWeight: '700', color: '#10b981', marginBottom: 12 },
-  historyRow: { marginBottom: 8 },
-  historyLabel: { fontSize: 11, color: '#64748b', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 },
-  historyValue: { fontSize: 14, color: '#e2e8f0', fontWeight: '500' },
-});

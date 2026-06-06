@@ -1,5 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { fetchJsonWithAuth } from './api/fetchWithAuth';
+import { API_BASE_URL } from './api/config';
 
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
 const USER_KEY = 'auth_user';
@@ -78,6 +80,11 @@ export async function getUserRoles(): Promise<string[]> {
   return user?.roles ?? [];
 }
 
+export async function getUserPermissions(): Promise<string[]> {
+  const user = await getUser();
+  return user?.permissions ?? [];
+}
+
 export async function hasPermission(permission: string): Promise<boolean> {
   const user = await getUser();
   const permissions: string[] = user?.permissions ?? [];
@@ -97,4 +104,20 @@ export async function mustChangePassword(): Promise<boolean> {
 
 export async function clearMustChangePasswordFlag(): Promise<void> {
   await storage.deleteItem(MUST_CHANGE_PASSWORD_KEY);
+}
+
+// Refresh user data from backend (permissions may have been updated by admin)
+export async function refreshUser(): Promise<void> {
+  try {
+    const permData = await fetchJsonWithAuth(`${API_BASE_URL}/api/v1/profile/permissions`);
+    if (permData?.permissions) {
+      const currentUser = await getUser();
+      await storage.setItem(USER_KEY, JSON.stringify({
+        ...currentUser,
+        permissions: permData.permissions,
+      }));
+    }
+  } catch (_e) {
+    // Silently fail — permissions will be stale but app still works
+  }
 }
