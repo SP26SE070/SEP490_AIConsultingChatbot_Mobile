@@ -677,7 +677,7 @@ export default function AdminEmployeesScreen() {
               {language === 'vi' ? 'Chi tiết nhân viên' : 'Employee Details'}
             </Text>
             <View style={styles.headerActions}>
-              <TouchableOpacity onPress={() => { setDetailModalOpen(false); openEdit(selectedEmployee!); }} style={styles.headerBtn}>
+              <TouchableOpacity onPress={() => { setDetailModalOpen(false); if (selectedEmployee) openEdit(selectedEmployee); }} style={styles.headerBtn}>
                 <Ionicons name="create-outline" size={sz(22)} color="#10b981" />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setDetailModalOpen(false)} style={styles.closeBtn}>

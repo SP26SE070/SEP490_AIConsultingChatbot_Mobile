@@ -17,17 +17,17 @@ export async function fetchWithAuth(
   // Handle session expiry
   if (res.status === 401) {
     const cloned = res.clone();
-      try {
-        const data = await cloned.json();
-        if (
-          data?.error?.includes('Session expired') ||
-          data?.message?.includes('Session expired')
-        ) {
-          await clearAuth();
-          router.replace('/login');
-          return res;
-        }
-      } catch {
+    try {
+      const data = await cloned.json();
+      if (
+        data?.error?.includes('Session expired') ||
+        data?.message?.includes('Session expired')
+      ) {
+        await clearAuth();
+        router.replace('/login');
+        return res;
+      }
+    } catch {
       // not JSON, continue
     }
   }

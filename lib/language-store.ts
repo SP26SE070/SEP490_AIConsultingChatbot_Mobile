@@ -55,9 +55,9 @@ export const translations = {
     history: 'Lịch sử',
     documents: 'Tài liệu',
     analytics: 'Phân tích',
-    profile: 'Hồ sơ',
     newChat: 'Tạo cuộc trò chuyện mới',
     manageEmployees: 'Quản lý nhân viên',
+    manageTenants: 'Quản lý tổ chức',
     approveTenant: 'Duyệt tổ chức',
     subscription: 'ĐĂNG KÝ GÓI',
     aiSettings: 'Cài đặt AI',
@@ -69,7 +69,6 @@ export const translations = {
 
     // Auth
     login: 'Đăng nhập',
-    logout: 'Đăng xuất',
     email: 'Email',
     password: 'Mật khẩu',
     forgotPassword: 'Quên mật khẩu?',
@@ -105,9 +104,6 @@ export const translations = {
     pullToRefresh: 'Kéo để làm mới',
 
     // Employee Management
-    manageEmployees: 'Quản lý nhân viên',
-    manageTenants: 'Quản lý tổ chức',
-    approveTenant: 'Duyệt tổ chức',
     employeeList: 'Danh sách nhân viên',
     total: 'Tổng',
     activate: 'Kích hoạt',
@@ -237,8 +233,11 @@ export const translations = {
     history: 'History',
     documents: 'Documents',
     analytics: 'Analytics',
-    profile: 'Profile',
     newChat: 'New Chat',
+    manageEmployees: 'Manage Employees',
+    manageTenants: 'Manage Tenants',
+    approveTenant: 'Approve Tenant',
+    subscription: 'SUBSCRIPTION',
     aiSettings: 'AI Settings',
     organizationSettings: 'Organization Settings',
 
@@ -248,7 +247,6 @@ export const translations = {
 
     // Auth
     login: 'Login',
-    logout: 'Logout',
     email: 'Email',
     password: 'Password',
     forgotPassword: 'Forgot password?',
@@ -284,9 +282,6 @@ export const translations = {
     pullToRefresh: 'Pull to refresh',
 
     // Employee Management
-    manageEmployees: 'Manage Employees',
-    manageTenants: 'Manage Tenants',
-    approveTenant: 'Approve Tenant',
     employeeList: 'Employee List',
     total: 'Total',
     activate: 'Activate',
@@ -300,9 +295,6 @@ export const translations = {
     createdAt: 'Created At',
     lastLogin: 'Last Login',
     noEmployees: 'No employees found',
-
-    // Subscription
-    subscription: 'SUBSCRIPTION',
 
     // Chat
     chatPlaceholder: 'Enter your message...',

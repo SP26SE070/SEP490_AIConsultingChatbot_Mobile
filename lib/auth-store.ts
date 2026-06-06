@@ -47,7 +47,7 @@ export async function setAuth(data: any): Promise<void> {
     id: data.id,
     email: data.email,
     tenantId: data.tenantId,
-    roles: data.roles,
+    roles: data.roles ?? [],
     permissions: data.permissions ?? [],
   }));
   if (data.mustChangePassword !== undefined) {
@@ -111,7 +111,7 @@ export async function refreshUser(): Promise<void> {
   try {
     const permData = await fetchJsonWithAuth(`${API_BASE_URL}/api/v1/profile/permissions`);
     if (permData?.permissions) {
-      const currentUser = await getUser();
+      const currentUser = (await getUser()) ?? {};
       await storage.setItem(USER_KEY, JSON.stringify({
         ...currentUser,
         permissions: permData.permissions,

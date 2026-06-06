@@ -159,7 +159,7 @@ export default function ChatbotScreen() {
   const isVi = language === 'vi';
   const navigation = useNavigation();
   const { showConfirm } = useNotification();
-  const { gap, sz, fs, pwp } = useResponsive();
+  const { gap, sz, fs } = useResponsive();
 
   // Responsive dimensions
   const inputSectionPaddingH = sz(16);

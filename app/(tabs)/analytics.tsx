@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { router } from 'expo-router';
 import { getDashboardAnalytics, type DashboardAnalytics } from '../../lib/api/analytics';
+import { getTenantInfo } from '../../lib/api/tenant-settings';
 import { getUserPermissions, getUserRoles, refreshUser } from '../../lib/auth-store';
 import { AppShell } from '../../components/layout/AppShell';
 import { AppLogo } from '../../components/brand/AppLogo';
@@ -232,7 +233,6 @@ export default function AnalyticsScreen() {
   const [tenantLogo, setTenantLogo] = useState<string | null>(null);
 
   useEffect(() => {
-    const { getTenantInfo } = require('../../lib/api/tenant-settings');
     getTenantInfo().then(info => {
       if (info?.logoUrl) setTenantLogo(info.logoUrl);
     }).catch(() => {});

@@ -15,7 +15,6 @@ import { PickerModal } from '../../components/ui/CustomModal';
 import { useResponsive } from '../../lib/useResponsive';
 
 const API_TIMEOUT = 15000;
-const DOWNLOAD_HISTORY_KEY = 'download_history';
 
 // Document interface
 interface Document {
@@ -306,10 +305,12 @@ export default function DocumentsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadDocuments();
-      loadCategories();
-      loadTags();
-    }, [])
+      (async () => {
+        await loadDocuments();
+        await loadCategories();
+        await loadTags();
+      })();
+    }, [loadDocuments, loadCategories, loadTags])
   );
 
   // ========== DOCUMENT HANDLERS ==========

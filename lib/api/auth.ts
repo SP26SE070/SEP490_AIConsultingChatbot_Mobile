@@ -7,6 +7,7 @@ export interface LoginResponse {
   email: string;
   tenantId: string;
   roles: string[];
+  permissions?: string[];
   mustChangePassword?: boolean;
 }
 
