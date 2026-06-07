@@ -550,6 +550,7 @@ export default function AnalyticsScreen() {
   }
 
   async function loadAnalytics() {
+    let capturedRoles: string[] = [];
     try {
       setError(null);
       const [result, roles] = await Promise.all([
@@ -557,7 +558,7 @@ export default function AnalyticsScreen() {
         getUserRoles(),
       ]);
       setData(result);
-      setUserRole(roles?.[0] || null);
+      setUserRole(roles && roles.length > 0 ? roles[0] : null);
     } catch (e: any) {
       if (e?.status === 401 || e?.message?.includes('đăng nhập') || e?.status === 403) {
         // No token or no permission — show 0 values instead of error
@@ -578,7 +579,7 @@ export default function AnalyticsScreen() {
             embeddingStatusBreakdown: { COMPLETED: 0, PROCESSING: 0, PENDING: 0, FAILED: 0 },
           },
         });
-        setUserRole(roles?.[0] || null);
+        setUserRole(capturedRoles[0] || null);
       } else {
         setError(t.cannotLoadData);
       }

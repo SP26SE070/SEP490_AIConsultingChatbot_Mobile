@@ -1,6 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { fetchJsonWithAuth } from './api/fetchWithAuth';
 import { API_BASE_URL } from './api/config';
 
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
@@ -109,7 +108,13 @@ export async function clearMustChangePasswordFlag(): Promise<void> {
 // Refresh user data from backend (permissions may have been updated by admin)
 export async function refreshUser(): Promise<void> {
   try {
-    const permData = await fetchJsonWithAuth(`${API_BASE_URL}/api/v1/profile/permissions`);
+    const token = _accessToken;
+    if (!token) return;
+    const res = await fetch(`${API_BASE_URL}/api/v1/profile/permissions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return;
+    const permData = await res.json();
     if (permData?.permissions) {
       const currentUser = (await getUser()) ?? {};
       await storage.setItem(USER_KEY, JSON.stringify({

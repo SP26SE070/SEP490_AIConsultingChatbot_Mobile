@@ -479,7 +479,7 @@ export default function OrganizationSettingsScreen() {
               </View>
               <View style={[styles.logoActions, { gap: cardHeaderGap }]}>
                 <TouchableOpacity
-                  style={[styles.logoActionBtn, { paddingVertical: logoActionPaddingV, paddingHorizontal: logoActionPaddingH, borderRadius: logoActionBtnRadius }]}
+                  style={[styles.logoActionBtn, { paddingVertical: logoActionPaddingV, paddingHorizontal: logoActionPaddingH, borderRadius: logoActionRadius }]}
                   onPress={handlePickLogo}
                   disabled={uploadingLogo || deletingLogo}
                 >
@@ -487,7 +487,7 @@ export default function OrganizationSettingsScreen() {
                   <Text style={[styles.logoActionText, { fontSize: logoActionTextSize }]}>{isVi ? 'Thay đổi' : 'Change'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.logoActionBtn, styles.logoDeleteBtn, { paddingVertical: logoActionPaddingV, paddingHorizontal: logoActionPaddingH, borderRadius: logoActionBtnRadius }]}
+                  style={[styles.logoActionBtn, styles.logoDeleteBtn, { paddingVertical: logoActionPaddingV, paddingHorizontal: logoActionPaddingH, borderRadius: logoActionRadius }]}
                   onPress={handleDeleteLogo}
                   disabled={deletingLogo || uploadingLogo}
                 >
@@ -508,7 +508,7 @@ export default function OrganizationSettingsScreen() {
               <Text style={[styles.selectedFileName, { fontSize: selectedFileNameSize }]}>{selectedLogo.name}</Text>
               <View style={[styles.logoActions, { gap: cardHeaderGap }]}>
                 <TouchableOpacity
-                  style={[styles.logoActionBtn, { paddingVertical: logoActionPaddingV, paddingHorizontal: logoActionPaddingH, borderRadius: logoActionBtnRadius }]}
+                  style={[styles.logoActionBtn, { paddingVertical: logoActionPaddingV, paddingHorizontal: logoActionPaddingH, borderRadius: logoActionRadius }]}
                   onPress={() => {
                     setSelectedLogo(null);
                     setLogoPreview(tenant?.additionalLogoUrl || tenant?.logoUrl || null);
@@ -519,7 +519,7 @@ export default function OrganizationSettingsScreen() {
                   <Text style={[styles.logoActionText, { fontSize: logoActionTextSize }]}>{isVi ? 'Hủy' : 'Cancel'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.logoUploadBtn, { paddingVertical: logoActionPaddingV, paddingHorizontal: logoActionPaddingH, borderRadius: logoActionBtnRadius }, uploadingLogo && styles.btnDisabled]}
+                  style={[styles.logoUploadBtn, { paddingVertical: logoActionPaddingV, paddingHorizontal: logoActionPaddingH, borderRadius: logoActionRadius }, uploadingLogo && styles.btnDisabled]}
                   onPress={handleUploadLogo}
                   disabled={uploadingLogo}
                 >

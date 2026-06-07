@@ -88,7 +88,6 @@ async function apiRequest(url: string, options: RequestInit = {}): Promise<Respo
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetchWithTimeout(url, { ...options, headers });
   if (res.status === 401) {
-    showError('Vui lòng đăng nhập lại.', 'Phiên đã hết hạn');
     throw new Error('Unauthorized');
   }
   return res;
@@ -1124,4 +1123,14 @@ const styles = StyleSheet.create({
   },
   submitBtnDisabled: { opacity: 0.6 },
   submitBtnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  uploadBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    borderRadius: 12,
+    borderStyle: 'dashed',
+    paddingVertical: 24,
+  },
+  uploadBtnText: { color: '#10b981', fontWeight: '600', fontSize: 14 },
 });

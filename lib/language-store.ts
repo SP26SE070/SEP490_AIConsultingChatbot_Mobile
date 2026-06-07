@@ -87,7 +87,6 @@ export const translations = {
     today: 'Hôm nay',
     thisMonth: 'Tháng này',
     requests: 'Yêu cầu',
-    documents: 'Tài liệu',
     totalDocuments: 'Tổng số tài liệu',
     totalChunks: 'Tổng số đoạn',
     avgChunks: 'TB đoạn/tài liệu',
@@ -159,7 +158,6 @@ export const translations = {
     notUpdated: 'Chưa cập nhật',
 
     // Settings
-    settings: 'Cài đặt',
     language: 'Ngôn ngữ',
     vietnamese: 'Tiếng Việt',
     english: 'English',
@@ -185,7 +183,6 @@ export const translations = {
     noDocuments: 'Chưa có tài liệu nào',
     addDocuments: 'Thêm tài liệu để bắt đầu',
     processed: 'Đã xử lý',
-    pending: 'Đang xử lý',
     uploadedAt: 'Tải lên lúc',
     fileSize: 'Dung lượng',
     new: 'MỚI',
@@ -265,7 +262,6 @@ export const translations = {
     today: 'Today',
     thisMonth: 'This Month',
     requests: 'Requests',
-    documents: 'Documents',
     totalDocuments: 'Total Documents',
     totalChunks: 'Total Chunks',
     avgChunks: 'Avg chunks/doc',
@@ -337,7 +333,6 @@ export const translations = {
     notUpdated: 'Not updated',
 
     // Settings
-    settings: 'Settings',
     language: 'Language',
     vietnamese: 'Tiếng Việt',
     english: 'English',
@@ -363,7 +358,6 @@ export const translations = {
     noDocuments: 'No documents yet',
     addDocuments: 'Add documents to get started',
     processed: 'Processed',
-    pending: 'Processing',
     uploadedAt: 'Uploaded at',
     fileSize: 'Size',
     new: 'NEW',

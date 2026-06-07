@@ -43,18 +43,18 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   const [error, setError] = useState<{ title?: string; message: string } | null>(null);
   const [info, setInfo] = useState<{ title?: string; message: string; buttonText?: string } | null>(null);
 
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>();
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Auto-dismiss toast
   useEffect(() => {
     if (toast) {
       toastTimer.current = setTimeout(() => setToast(null), toast.duration);
-      return () => clearTimeout(toastTimer.current);
+      return () => { if (toastTimer.current !== undefined) clearTimeout(toastTimer.current); };
     }
   }, [toast]);
 
   const showToast = useCallback((message: string, type: ToastType = 'info', duration = 2500) => {
-    clearTimeout(toastTimer.current);
+    if (toastTimer.current !== undefined) clearTimeout(toastTimer.current);
     setToast({ message, type, duration });
   }, []);
 

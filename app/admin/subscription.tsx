@@ -7,9 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { AppShell } from '../../components/layout/AppShell';
 import { useLanguageStore, translations } from '../../lib/language-store';
-import { getAccessToken } from '../../lib/auth-store';
+import { getAccessToken, refreshUser } from '../../lib/auth-store';
 import { API_BASE_URL } from '../../lib/api/config';
-import { getPaymentHistory, type PaymentHistoryItem, type PaymentStatus } from '../../lib/api/payment';
+import { getPaymentHistory, confirmPendingPayment, type PaymentHistoryItem, type PaymentStatus } from '../../lib/api/payment';
 import { useNotification } from '../../lib/notification';
 import { useResponsive } from '../../lib/useResponsive';
 
@@ -705,6 +705,40 @@ export default function AdminSubscriptionScreen() {
     fetchPaymentHistory();
   }
 
+  async function handleCheckPayment(paymentId: string) {
+    const confirmed = await showConfirm({
+      title: language === 'vi' ? 'Xác nhận thanh toán' : 'Confirm Payment',
+      message: language === 'vi'
+        ? 'Bạn đã chuyển khoản thành công? Nhấn Xác nhận để kích hoạt gói đăng ký.'
+        : 'Have you transferred successfully? Press Confirm to activate your subscription.',
+      confirmText: language === 'vi' ? 'Xác nhận đã chuyển tiền' : 'Confirm Transfer',
+      cancelText: language === 'vi' ? 'Chưa' : 'Not yet',
+      icon: 'checkmark-circle',
+      iconColor: '#10b981',
+    });
+    if (!confirmed) return;
+
+    try {
+      await confirmPendingPayment(paymentId);
+      await refreshUser();
+      showSuccess(
+        language === 'vi'
+          ? 'Xác nhận thanh toán thành công! Gói đăng ký đã được kích hoạt.'
+          : 'Payment confirmed! Your subscription is now active.',
+        language === 'vi' ? 'Thành công' : 'Success'
+      );
+      fetchSubscription();
+      fetchPaymentHistory();
+      setSelectedTab('current');
+      setShowPaymentSuccessModal(true);
+    } catch (e: any) {
+      showError(
+        e?.message || (language === 'vi' ? 'Không thể xác nhận thanh toán.' : 'Cannot confirm payment.'),
+        language === 'vi' ? 'Lỗi' : 'Error'
+      );
+    }
+  }
+
   function getPaymentStatusInfo(status?: PaymentStatus | string) {
     switch (status) {
       case 'SUCCESS':
@@ -1307,6 +1341,18 @@ export default function AdminSubscriptionScreen() {
                       </Text>
                       <Text style={styles.historyValue}>{formatDate(item.paid_at)}</Text>
                     </View>
+                  )}
+
+                  {item.status === 'PENDING' && (
+                    <TouchableOpacity
+                      style={{ marginTop: 12, paddingVertical: 10, borderRadius: 8, alignItems: 'center', backgroundColor: 'rgba(245, 158, 11, 0.15)' }}
+                      onPress={() => handleCheckPayment(item.payment_id)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ color: '#f59e0b', fontWeight: '700', fontSize: 13 }}>
+                        {language === 'vi' ? 'Kiểm tra thanh toán' : 'Check payment status'}
+                      </Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               );

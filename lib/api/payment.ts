@@ -19,3 +19,7 @@ export interface PaymentHistoryItem {
 export async function getPaymentHistory(): Promise<PaymentHistoryItem[]> {
   return fetchJsonWithAuth<PaymentHistoryItem[]>(`${PAYMENT_BASE}/history`);
 }
+
+export async function confirmPendingPayment(paymentId: string): Promise<{ message: string; status: string }> {
+  return fetchJsonWithAuth(`${PAYMENT_BASE}/confirm-pending/${paymentId}`, { method: 'POST' });
+}
