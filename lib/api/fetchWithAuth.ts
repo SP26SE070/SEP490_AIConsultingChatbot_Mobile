@@ -26,6 +26,7 @@ export async function fetchWithAuth(
 
   const res = await fetchWithTimeout(url, { ...options, headers }, timeoutMs);
 
+  // Handle session expiry
   if (res.status === 401) {
     const cloned = res.clone();
     try {
@@ -56,6 +57,7 @@ export async function fetchJsonWithAuth<T = any>(
 
   const text = await res.text();
 
+  // Check if response is HTML (not authenticated or error page)
   if (text.trim().startsWith('<')) {
     if (text.includes('login') || text.includes('Login')) {
       throw { status: 401, message: 'Vui lòng đăng nhập lại' };

@@ -8,8 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
-import { clearAuth, isRole, getUser } from '../../lib/auth-store';
-import { clearChatSession } from '../../lib/chat-session-store';
+import { clearAuth, isRole } from '../../lib/auth-store';
 import { requestNewChat } from '../../lib/navigation-store';
 import { useLanguageStore, translations } from '../../lib/language-store';
 import { AppLogo } from '../brand/AppLogo';
@@ -42,18 +41,15 @@ const ADMIN_NAV: NavItem[] = [
   { href: '/documents', labelKey: 'documents', icon: 'document-text-outline', iconActive: 'document-text' },
   { href: '/analytics', labelKey: 'analytics', icon: 'analytics-outline', iconActive: 'analytics' },
   { href: '/admin/employees', labelKey: 'manageEmployees', icon: 'people-outline', iconActive: 'people' },
-  { href: '/admin/organization-settings', labelKey: 'organizationSettings', icon: 'business-outline', iconActive: 'business' },
   { href: '/admin/ai-settings', labelKey: 'aiSettings', icon: 'bulb-outline', iconActive: 'bulb' },
   { href: '/admin/subscription', labelKey: 'subscription', icon: 'card-outline', iconActive: 'card' },
 ];
 
 interface AppSidebarProps {
   onNavigate?: () => void;
-  /** Adaptive sidebar width — passed from AppShell */
-  sidebarWidth?: number;
 }
 
-export function AppSidebar({ onNavigate, sidebarWidth = 280 }: AppSidebarProps) {
+export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const pathname = usePathname();
   const { language } = useLanguageStore();
   const t = translations[language];
@@ -89,14 +85,6 @@ export function AppSidebar({ onNavigate, sidebarWidth = 280 }: AppSidebarProps) 
   }
 
   async function handleLogout() {
-    try {
-      const user = await getUser();
-      if (user?.id) {
-        await clearChatSession(user.id);
-      }
-    } catch {
-      // ignore
-    }
     await clearAuth();
     onNavigate?.();
     router.replace('/login');
@@ -138,7 +126,7 @@ export function AppSidebar({ onNavigate, sidebarWidth = 280 }: AppSidebarProps) 
 
   if (isLoading) {
     return (
-      <View style={[styles.sidebar, { width: sidebarWidth }]}>
+      <View style={styles.sidebar}>
         <View style={styles.loading}>
           <Ionicons name="sync-outline" size={24} color="#64748b" />
         </View>
@@ -146,21 +134,13 @@ export function AppSidebar({ onNavigate, sidebarWidth = 280 }: AppSidebarProps) 
     );
   }
 
-  // Scale padding/icon sizes based on sidebar width
-  const padH   = sidebarWidth < 260 ? 12 : 16;
-  const logoSz  = sidebarWidth < 260 ? 40 : 48;
-  const logoRad = sidebarWidth < 260 ? 12 : 14;
-  const iconSz  = sidebarWidth < 260 ? 18 : 22;
-  const btnPadV = sidebarWidth < 260 ? 10 : 14;
-  const footerPad = sidebarWidth < 260 ? 12 : 16;
-
   return (
-    <View style={[styles.sidebar, { width: sidebarWidth }]}>
+    <View style={styles.sidebar}>
       {/* Header */}
-      <View style={[styles.header, { paddingHorizontal: padH, paddingBottom: padH }]}>
+      <View style={styles.header}>
         <View style={styles.logoRow}>
-          <View style={[styles.logoWrap, { width: logoSz, height: logoSz, borderRadius: logoRad }]}>
-            <AppLogo size={iconSz} />
+          <View style={styles.logoWrap}>
+            <AppLogo size={36} />
           </View>
           <View style={styles.headerText}>
             <Text style={styles.appTitle}>{t.appTitle}</Text>
@@ -236,9 +216,9 @@ export function AppSidebar({ onNavigate, sidebarWidth = 280 }: AppSidebarProps) 
           <>
             {/* New Chat Button - Only for employee */}
             {userRole === 'employee' && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { paddingVertical: btnPadV }]}
-              onPress={handleNewChat}
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={handleNewChat}
                 activeOpacity={0.85}
               >
                 <Ionicons name="add-circle" size={22} color="#fff" />
@@ -284,9 +264,9 @@ export function AppSidebar({ onNavigate, sidebarWidth = 280 }: AppSidebarProps) 
       </ScrollView>
 
       {/* Footer - Logout only */}
-      <View style={[styles.footer, { padding: footerPad }]}>
+      <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.logoutBtn, { paddingVertical: btnPadV, paddingHorizontal: padH }]}
+          style={styles.logoutBtn}
           onPress={handleLogout}
           activeOpacity={0.8}
         >
@@ -311,7 +291,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   header: {
+    paddingHorizontal: 16,
     paddingTop: 20,
+    paddingBottom: 16,
     gap: 12,
   },
   logoRow: {
@@ -320,9 +302,12 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   logoWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },
@@ -387,6 +372,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
+    flexShrink: 1,
+    adjustsFontSizeToFit: true,
+    minFontSize: 11,
   },
   navList: {
     gap: 6,
@@ -419,6 +407,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#94a3b8',
     flex: 1,
+    flexShrink: 1,
+    adjustsFontSizeToFit: true,
+    minFontSize: 11,
   },
   navLabelActive: {
     color: '#f1f5f9',
@@ -499,6 +490,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#f1f5f9',
+    flexShrink: 1,
+    adjustsFontSizeToFit: true,
+    minFontSize: 12,
   },
   staffLabelActive: {
     color: '#10b981',
@@ -507,5 +501,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748b',
     lineHeight: 18,
+    flexShrink: 1,
+    adjustsFontSizeToFit: true,
+    minFontSize: 10,
   },
 });

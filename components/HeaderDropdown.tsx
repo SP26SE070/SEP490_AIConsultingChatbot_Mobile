@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Pressable, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Pressable, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore } from '../lib/language-store';
 import { useRouter } from 'expo-router';
@@ -54,12 +54,13 @@ export function HeaderDropdown() {
         onPress={() => setOpen(!open)}
         activeOpacity={0.7}
       >
-        <Ionicons name="ellipsis-vertical" size={20} color="#f1f5f9" />
+        <Ionicons name="ellipsis-horizontal" size={20} color="#f1f5f9" />
       </TouchableOpacity>
 
       {open && (
-        <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
-          <Animated.View 
+        <>
+          <Pressable style={styles.overlay} onPress={() => setOpen(false)} />
+          <Animated.View
             style={[
               styles.dropdownContainer,
               {
@@ -145,7 +146,7 @@ export function HeaderDropdown() {
             {/* Arrow */}
             <View style={styles.arrow} />
           </Animated.View>
-        </Pressable>
+        </>
       )}
     </View>
   );
@@ -166,11 +167,7 @@ const styles = StyleSheet.create({
     borderColor: '#334155',
   },
   overlay: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: -Dimensions.get('window').height,
-    left: -Dimensions.get('window').width + 80,
+    ...StyleSheet.absoluteFillObject,
     zIndex: 999,
   },
   dropdownContainer: {
@@ -267,6 +264,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#94a3b8',
+    flexShrink: 1,
+    adjustsFontSizeToFit: true,
+    minFontSize: 11,
   },
   optionTextActive: {
     color: '#f1f5f9',

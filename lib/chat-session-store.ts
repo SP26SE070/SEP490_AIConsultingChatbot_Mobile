@@ -1,9 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-export function getChatSessionKey(userId: string): string {
-  return `chat_session_${userId}`;
-}
+const CHAT_SESSION_KEY = 'chat_session_state';
 
 interface ChatSession {
   conversationId?: string;
@@ -46,21 +44,21 @@ const storage = {
 // Session expiry time: 30 minutes
 const SESSION_EXPIRY_MS = 30 * 60 * 1000;
 
-export async function saveChatSession(userId: string, session: ChatSession): Promise<void> {
+export async function saveChatSession(session: ChatSession): Promise<void> {
   try {
     const sessionWithTimestamp = {
       ...session,
       lastUpdated: Date.now(),
     };
-    await storage.setItem(getChatSessionKey(userId), JSON.stringify(sessionWithTimestamp));
+    await storage.setItem(CHAT_SESSION_KEY, JSON.stringify(sessionWithTimestamp));
   } catch (e) {
     console.warn('Failed to save chat session:', e);
   }
 }
 
-export async function loadChatSession(userId: string): Promise<ChatSession | null> {
+export async function loadChatSession(): Promise<ChatSession | null> {
   try {
-    const raw = await storage.getItem(getChatSessionKey(userId));
+    const raw = await storage.getItem(CHAT_SESSION_KEY);
     if (!raw) return null;
 
     const session: ChatSession = JSON.parse(raw);
@@ -68,7 +66,7 @@ export async function loadChatSession(userId: string): Promise<ChatSession | nul
     // Check if session is expired
     const now = Date.now();
     if (now - session.lastUpdated > SESSION_EXPIRY_MS) {
-      await clearChatSession(userId);
+      await clearChatSession();
       return null;
     }
 
@@ -79,15 +77,15 @@ export async function loadChatSession(userId: string): Promise<ChatSession | nul
   }
 }
 
-export async function clearChatSession(userId: string): Promise<void> {
+export async function clearChatSession(): Promise<void> {
   try {
-    await storage.deleteItem(getChatSessionKey(userId));
+    await storage.deleteItem(CHAT_SESSION_KEY);
   } catch (e) {
     console.warn('Failed to clear chat session:', e);
   }
 }
 
-export async function getChatSessionConversationId(userId: string): Promise<string | undefined> {
-  const session = await loadChatSession(userId);
+export async function getChatSessionConversationId(): Promise<string | undefined> {
+  const session = await loadChatSession();
   return session?.conversationId;
 }

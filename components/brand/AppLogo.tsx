@@ -1,7 +1,6 @@
 import { Image, StyleSheet, View } from 'react-native';
 import { useState } from 'react';
-
-const DEFAULT_LOGO_URL = 'https://res.cloudinary.com/dhaltx1cv/image/upload/v1779854128/copy_of_uirfjb5hfsfz2xhbszik.png';
+import AdaptiveIconAsset from '../../assets/adaptive-icon.png';
 
 interface AppLogoProps {
   size?: number;
@@ -11,13 +10,14 @@ interface AppLogoProps {
 
 export function AppLogo({ size = 40, tenantLogoUrl = null, tenantName = null }: AppLogoProps) {
   const [imageError, setImageError] = useState(false);
-  const resolvedLogoUrl = tenantLogoUrl?.trim() || DEFAULT_LOGO_URL;
+
+  const hasTenantLogo = tenantLogoUrl?.trim() && tenantLogoUrl.startsWith('http');
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
       {!imageError ? (
         <Image
-          source={{ uri: resolvedLogoUrl }}
+          source={hasTenantLogo ? { uri: tenantLogoUrl } : AdaptiveIconAsset}
           style={styles.logo}
           resizeMode="contain"
           onError={() => setImageError(true)}

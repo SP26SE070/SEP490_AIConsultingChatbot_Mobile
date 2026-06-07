@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "SEP490_AIConsultingChatbot_Mobile",
+    "name": "AI Chatbot",
     "slug": "SEP490_AIConsultingChatbot_Mobile",
     "version": "1.0.1",
     "scheme": "sep490-aiconsulting",
@@ -8,21 +8,21 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/adaptive-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0f172a"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
-      "package": "com.sep490.aiconsultingchatbot"
+      "package": "com.sep490.aiconsultingchatbot",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f172a"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -38,9 +38,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "e1d71d24-42d1-493e-8049-ad00f885500e"
+        "projectId": "1a2e6081-8203-49bf-a3da-3daea8edc551"
       }
     },
-    "owner": "dt.2401"
+    "owner": "quanp"
   }
 }

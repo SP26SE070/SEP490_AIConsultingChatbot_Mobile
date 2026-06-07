@@ -55,13 +55,12 @@ export const translations = {
     history: 'Lịch sử',
     documents: 'Tài liệu',
     analytics: 'Phân tích',
+    profile: 'Hồ sơ',
     newChat: 'Tạo cuộc trò chuyện mới',
     manageEmployees: 'Quản lý nhân viên',
-    manageTenants: 'Quản lý tổ chức',
     approveTenant: 'Duyệt tổ chức',
     subscription: 'ĐĂNG KÝ GÓI',
     aiSettings: 'Cài đặt AI',
-    organizationSettings: 'Cài đặt tổ chức',
 
     // App
     appTitle: 'AI Chatbot',
@@ -69,6 +68,7 @@ export const translations = {
 
     // Auth
     login: 'Đăng nhập',
+    logout: 'Đăng xuất',
     email: 'Email',
     password: 'Mật khẩu',
     forgotPassword: 'Quên mật khẩu?',
@@ -87,6 +87,7 @@ export const translations = {
     today: 'Hôm nay',
     thisMonth: 'Tháng này',
     requests: 'Yêu cầu',
+    documents: 'Tài liệu',
     totalDocuments: 'Tổng số tài liệu',
     totalChunks: 'Tổng số đoạn',
     avgChunks: 'TB đoạn/tài liệu',
@@ -103,6 +104,9 @@ export const translations = {
     pullToRefresh: 'Kéo để làm mới',
 
     // Employee Management
+    manageEmployees: 'Quản lý nhân viên',
+    manageTenants: 'Quản lý tổ chức',
+    approveTenant: 'Duyệt tổ chức',
     employeeList: 'Danh sách nhân viên',
     total: 'Tổng',
     activate: 'Kích hoạt',
@@ -158,6 +162,7 @@ export const translations = {
     notUpdated: 'Chưa cập nhật',
 
     // Settings
+    settings: 'Cài đặt',
     language: 'Ngôn ngữ',
     vietnamese: 'Tiếng Việt',
     english: 'English',
@@ -183,6 +188,7 @@ export const translations = {
     noDocuments: 'Chưa có tài liệu nào',
     addDocuments: 'Thêm tài liệu để bắt đầu',
     processed: 'Đã xử lý',
+    pending: 'Đang xử lý',
     uploadedAt: 'Tải lên lúc',
     fileSize: 'Dung lượng',
     new: 'MỚI',
@@ -230,13 +236,9 @@ export const translations = {
     history: 'History',
     documents: 'Documents',
     analytics: 'Analytics',
+    profile: 'Profile',
     newChat: 'New Chat',
-    manageEmployees: 'Manage Employees',
-    manageTenants: 'Manage Tenants',
-    approveTenant: 'Approve Tenant',
-    subscription: 'SUBSCRIPTION',
     aiSettings: 'AI Settings',
-    organizationSettings: 'Organization Settings',
 
     // App
     appTitle: 'AI Chatbot',
@@ -244,6 +246,7 @@ export const translations = {
 
     // Auth
     login: 'Login',
+    logout: 'Logout',
     email: 'Email',
     password: 'Password',
     forgotPassword: 'Forgot password?',
@@ -262,6 +265,7 @@ export const translations = {
     today: 'Today',
     thisMonth: 'This Month',
     requests: 'Requests',
+    documents: 'Documents',
     totalDocuments: 'Total Documents',
     totalChunks: 'Total Chunks',
     avgChunks: 'Avg chunks/doc',
@@ -278,6 +282,9 @@ export const translations = {
     pullToRefresh: 'Pull to refresh',
 
     // Employee Management
+    manageEmployees: 'Manage Employees',
+    manageTenants: 'Manage Tenants',
+    approveTenant: 'Approve Tenant',
     employeeList: 'Employee List',
     total: 'Total',
     activate: 'Activate',
@@ -291,6 +298,9 @@ export const translations = {
     createdAt: 'Created At',
     lastLogin: 'Last Login',
     noEmployees: 'No employees found',
+
+    // Subscription
+    subscription: 'SUBSCRIPTION',
 
     // Chat
     chatPlaceholder: 'Enter your message...',
@@ -333,6 +343,7 @@ export const translations = {
     notUpdated: 'Not updated',
 
     // Settings
+    settings: 'Settings',
     language: 'Language',
     vietnamese: 'Tiếng Việt',
     english: 'English',
@@ -358,6 +369,7 @@ export const translations = {
     noDocuments: 'No documents yet',
     addDocuments: 'Add documents to get started',
     processed: 'Processed',
+    pending: 'Processing',
     uploadedAt: 'Uploaded at',
     fileSize: 'Size',
     new: 'NEW',

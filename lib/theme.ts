@@ -25,10 +25,4 @@ export const COLORS = {
 export const LAYOUT = {
   sidebarWidth: 280,
   tabletBreakpoint: 768,
-  /** Bottom tab bar height — kept fixed so it never shrinks */
-  tabBarHeight: 60,
-  /** Safe area top/bottom helpers (used with SafeAreaView edges) */
-  safeTop: ['top'] as const,
-  safeBottom: ['bottom'] as const,
-  safeAll: ['top', 'bottom', 'left', 'right'] as const,
 };

@@ -12,18 +12,15 @@
     "build:android:apk:prod": "npx eas-cli build -p android --profile production"
   },
   "dependencies": {
-    "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~54.0.35",
-    "expo-auth-session": "~7.0.11",
     "expo-constants": "~18.0.13",
     "expo-document-picker": "~14.0.4",
     "expo-file-system": "~19.0.23",
-    "expo-image-picker": "~17.0.11",
+    "expo-image-picker": "~17.0.0",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",
     "expo-media-library": "~18.2.1",
-    "expo-random": "^14.0.1",
     "expo-router": "~6.0.24",
     "expo-secure-store": "~15.0.8",
     "expo-sharing": "~14.0.8",
@@ -40,6 +37,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "eas-cli": "^20.1.0",
     "typescript": "~5.9.2"
   },
   "private": true
