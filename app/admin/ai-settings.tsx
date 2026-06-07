@@ -9,6 +9,7 @@ import { AppShell } from '../../components/layout/AppShell';
 import { AppLogo } from '../../components/brand/AppLogo';
 import { useLanguageStore, translations } from '../../lib/language-store';
 import { getChatbotConfig, updateChatbotConfig, type ChatbotMode } from '../../lib/api/chatbot-config';
+import { getTenantInfo } from '../../lib/api/tenant-settings';
 import { useNotification } from '../../lib/notification';
 import { useResponsive } from '../../lib/useResponsive';
 
@@ -66,7 +67,6 @@ export default function AISettingsScreen() {
   const [tenantLogo, setTenantLogo] = useState<string | null>(null);
 
   useEffect(() => {
-    const { getTenantInfo } = require('../../lib/api/tenant-settings');
     getTenantInfo().then(info => {
       if (info?.logoUrl) setTenantLogo(info.logoUrl);
     }).catch(() => {});
@@ -79,7 +79,7 @@ export default function AISettingsScreen() {
       setMode(config.mode || 'BALANCED');
       setOriginalMode(config.mode || 'BALANCED');
     } catch (e: any) {
-      console.log('Load config error:', e);
+      console.warn('Load config error:', e);
       setError(isVi ? 'Không thể tải cấu hình AI' : 'Failed to load AI config');
     } finally {
       setLoading(false);
@@ -101,7 +101,7 @@ export default function AISettingsScreen() {
       setOriginalMode(mode);
       showSuccess(isVi ? 'Đã lưu cài đặt AI' : 'AI settings saved', isVi ? 'Thành công' : 'Success');
     } catch (e: any) {
-      console.log('Save error:', e);
+      console.warn('Save error:', e);
       showError(isVi ? 'Không thể lưu cài đặt' : 'Failed to save settings', isVi ? 'Lỗi' : 'Error');
     } finally {
       setSaving(false);

@@ -23,7 +23,6 @@ export async function migrateOldChatSessionIfExists(): Promise<void> {
     const raw = await getItem(OLD_KEY);
     if (!raw) return;
     await deleteItem(OLD_KEY);
-    console.log('Migrated old chat session data to new user-specific format');
   } catch (e) {
     console.warn('Failed to migrate old chat session:', e);
   }

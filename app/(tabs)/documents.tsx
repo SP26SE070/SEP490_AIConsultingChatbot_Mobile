@@ -256,12 +256,7 @@ export default function DocumentsScreen() {
   // ========== LOAD DATA ==========
   async function loadDocuments() {
     try {
-        const token = await getAccessToken();
-        try {
-          // eslint-disable-next-line no-console
-          console.debug('[Documents] loading docs, url=', `${API_BASE}/knowledge/documents`, 'tokenExists=', !!token);
-        } catch {}
-        const res = await apiRequest(`${API_BASE}/knowledge/documents`);
+      const res = await apiRequest(`${API_BASE}/knowledge/documents`);
       if (res.ok) {
         const data = await res.json();
         const docs = data.content || data.data || data || [];
